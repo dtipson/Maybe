@@ -1,0 +1,16 @@
+{
+  "name": "Maybe",
+  "version": "0.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "tap tests/*.js --cov"
+  },
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "faucet": "0.0.1",
+    "tape": "~4.6.0",
+    "tap": "~6.3.0"
+  }
+}
