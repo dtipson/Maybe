@@ -41,6 +41,7 @@ Just.prototype.cata = function({Just}){ return Just(this.value) };
 const Maybe = {
   of: x => new Just(x),
   empty: _ => Nothing,
+  toBool: m => m.toString()!==Nothing,//reduce value/no value to true or false
   isNull: x=> x===null || x===undefined,
   fromNullable: x=> Maybe.isNull(x) ? Nothing : Just(x),
   maybe: function(nothingVal, justFn, m) {
