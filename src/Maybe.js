@@ -11,7 +11,7 @@ const Nothing = (function(){
   Nothing.prototype.getOrElse = Nothing.prototype.concat = x => x;
   Nothing.prototype.cata = ({Nothing}) => Nothing();  //not the Nothing type constructor here, btw, a prop named Nothing!
   Nothing.prototype.equals = function(y){return y==this;};//setoid
-  Nothing.prototype.toString = _ => `Nothing`;
+  Nothing.prototype.toString = _ => 'Nothing';
 
   return Nothing();
 
@@ -41,7 +41,7 @@ Just.prototype.cata = function({Just}){ return Just(this.value) };
 const Maybe = {
   of: x => new Just(x),
   empty: _ => Nothing,
-  toBool: m => m.toString()!==Nothing,//reduce value/no value to true or false
+  toBool: m => m!==Nothing,//reduce value/no value to true or false
   isNull: x=> x===null || x===undefined,
   fromNullable: x=> Maybe.isNull(x) ? Nothing : Just(x),
   maybe: function(nothingVal, justFn, m) {

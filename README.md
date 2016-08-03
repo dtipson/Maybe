@@ -17,6 +17,11 @@ Just([4]).sequence(Array.of);//-> [Just[4]]
 Just([4]).sequence(Array.of).filter(x => !4).sequence(Maybe.of);//-> Just([])
 Just([4]).sequence(Array.of).filter(x => !4).sequence(Maybe.of).concat(Just([6]));//-> Just([6])
 
+
+Array.of(Just([4]));//type within type within type: [Just[[4]]]
+Array.of(Just([4])).sequence(Just);//Just[[4]]
+
+Array.of(Just([4])).sequence(Just).map(x=>x.flatten());//flatten removes the outer covering of the double Array wrapping
 ```
 
 `npm run test` to run tests: the primary pedagogical purpose for this repo is thinking through what would make good tests of all the interfaces (the lawful tests, demonstration operations, etc.)
