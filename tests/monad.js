@@ -2,7 +2,7 @@
 const test = require('tap').test;//more verbose
 
 
-const {Maybe,Just,Nothing} = require('../src/Maybe.js');
+const {Maybe,Nothing} = require('../src/Maybe.js');
 
 
 //with Something!
@@ -12,7 +12,7 @@ test('Left Identity', function (t) {
   const testValue = 6;
 
   const left = Maybe.of(testValue).chain(testFunc);
-  const right = testFunc(testValue)
+  const right = testFunc(testValue);
 
   t.same(left, right, 'same internal value');
   t.end();
