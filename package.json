@@ -4,7 +4,8 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "tap tests/*.js --cov"
+    "test": "tap tests/*.js --cov",
+    "build": "browserify index.js -o bundle.js"
   },
   "author": "",
   "license": "ISC",

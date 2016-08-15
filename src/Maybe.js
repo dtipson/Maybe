@@ -11,8 +11,8 @@ const Nothing = (function(){
   Nothing.prototype.equals = function(y){return y==this;};//setoid
   Nothing.prototype.toString = _ => 'Nothing';
   Nothing.prototype.toBoolean = _ => false;//reduce a Nothing to false
-  Nothing.prototype[Symbol.toPrimitive] = function(hint){ return hint=='string' ? "" : 0; };//define some behavior for coercion
-  Nothing.prototype.toJSON = _ => '{ "type": "Maybe.Nothing"}';
+  Nothing.prototype[Symbol.toPrimitive] = function(hint){ return hint=='string' ? "" : 0; };//define some behavior for coercion: empty string for string coercion, 0 for number coercion
+  Nothing.prototype.toJSON = _ => '{"type":"Maybe.Nothing"}';
 
   return new Nothing();
 })();//result will fail an instanceof Nothing check, because "Nothing" is not the Nothing constructor in the outer scope
@@ -40,11 +40,11 @@ Just.prototype.concat = function(b){
   return b.value && !Maybe.isNull(b.value) ? Just(this.value.concat ? this.value.concat(b.value) : this.value + b.value) : this 
 };
 Just.prototype.equals = function(y){ return y.value === this.value; };//strictly compare the inner values
-Just.prototype[Symbol.toPrimitive] = Just.prototype.getOrElse = function(){ return this.value; }//extracts the inner value
+Just.prototype[Symbol.toPrimitive] = Just.prototype.getOrElse = function(){ return this.value; };//extract the inner value when forcibly coerced to deliver a value
 Just.prototype.orElse = function(){ return this; }//does nothing in the Just case
 Just.prototype.cata = function({Just}){ return Just(this.value) };//calls the function defined in prop "Just" with the inner value
 Just.prototype.toBoolean = _ => true;//reduce a Just to true. Useful in filters
-Just.prototype.toJSON = function(){ return `{ "type": "Maybe.Just", "value": ${JSON.stringify(this.value)} }`; };
+Just.prototype.toJSON = function(){ return `{"type":"Maybe.Just","value":${JSON.stringify(this.value)}}`; };
 
 //we're not strictly defining Just and Nothing as subtypes of Maybe here, but we DO want to have a Maybe interface for more abstract usages
 const Maybe = {
