@@ -77,9 +77,8 @@ Promise.prototype.concat = function(that){
  return Promise.race([this,that]);
 };
 
-//first _resolving_ promise wins, otherwise the first rejecting
-//seems to work? What is it called tho?
-Promise.prototype.concat2 = function(that){
+//the first _resolving_ promise wins, otherwise the first rejecting
+Promise.prototype.hopefulConcat = function(that){
   return Promise.race([this,that]).catch(
   e => {
     console.log('one rejected');
@@ -98,7 +97,8 @@ Promise.prototype.concat2 = function(that){
   });
 };
 
-Promise.prototype.challenge = function(arr){
+//just a reduce using concat2, takes the first to resolve, or first to reject once all have rejected
+Promise.prototype.enterChallengers = function(arr){
   return arr.reduce((acc,x) => acc.concat2(x), this);
 }
 

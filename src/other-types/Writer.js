@@ -21,6 +21,8 @@ Writer.prototype.ap = function(wr){
 }
 Writer.prototype.fst = function(){return this[0]};
 Writer.prototype.snd = function(){return this[1]};
+Writer.prototype.swap = function(){return Writer(this[1],this[0])};
+
 
 const writerize = Writer.lift = (log, fn) => x => Writer(log, fn(x));
 

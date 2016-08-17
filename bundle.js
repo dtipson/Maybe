@@ -3,17 +3,18 @@ require('./src/other-types/Array-helpers.js');
 require('./src/other-types/Promise-helpers.js');
 const Const = require('./src/other-types/Const.js');
 const Writer = require('./src/other-types/Writer.js');
+const Tuple = require('./src/other-types/Tuple.js');
 const Reader = require('./src/other-types/Reader.js');
 const IO = require('./src/other-types/IO.js');
 
 Object.assign(
   window, 
   require('./src/Maybe.js'),
-  {Const,Reader,Writer,IO},
+  {Const,Reader,Writer,IO,Tuple},
   require('./src/other-types/pointfree.js'),
   require('./src/other-types/utility.js')
 );
-},{"./src/Maybe.js":2,"./src/other-types/Array-helpers.js":3,"./src/other-types/Const.js":4,"./src/other-types/IO.js":5,"./src/other-types/Promise-helpers.js":6,"./src/other-types/Reader.js":7,"./src/other-types/Writer.js":8,"./src/other-types/pointfree.js":9,"./src/other-types/utility.js":10}],2:[function(require,module,exports){
+},{"./src/Maybe.js":2,"./src/other-types/Array-helpers.js":3,"./src/other-types/Const.js":4,"./src/other-types/IO.js":5,"./src/other-types/Promise-helpers.js":6,"./src/other-types/Reader.js":7,"./src/other-types/Tuple.js":8,"./src/other-types/Writer.js":9,"./src/other-types/pointfree.js":10,"./src/other-types/utility.js":11}],2:[function(require,module,exports){
 //We only ever need one "Nothing" so we'll define the type, create the one instance, and return it. We could have just created an object with 
 //all these methods on it, but then it wouldn't log as nicely/clearly
 const Nothing = (function(){
@@ -346,6 +347,55 @@ Reader.binary = fn => x => Reader.ask.map(y => fn(y, x));
 
 module.exports = Reader;
 },{}],8:[function(require,module,exports){
+function Tuple(x, y) {
+  if (!(this instanceof Tuple)) {
+    return new Tuple(x,y);
+  }
+  this[0] = x;//log
+  this[1] = y;//value
+  this.length = 2;
+}
+
+Tuple.of = x => y => new Tuple(x, y);
+Tuple.prototype.of = Tuple.of;
+
+Tuple.prototype.chain = function(f){
+  const tuple = f(this[1]);
+  return new Tuple(this[0].concat(' ',tuple[0]), tuple[1]);
+}
+Tuple.prototype.map = function(f){
+  return new Tuple( this[0], f(this[1]) );
+}
+Tuple.prototype.ap = function(wr){
+  return Tuple( this[0].concat(' ', wr[0]), this[1](wr[1]) );
+}
+Tuple.prototype.fst = function(){return this[0]};
+Tuple.prototype.snd = function(){return this[1]};
+Tuple.prototype.swap = function(){return Tuple(this[1],this[0])};
+
+
+const Tupleize = Tuple.lift = (xval, yfn) => x => Tuple(xval, yfn(x));
+
+
+//semigroup
+Tuple.prototype.concat = function(wr){
+  return Tuple( this[0].concat(' ', wr[0]), this[1].concat(wr[1]) );
+}
+//allows merging of Tuples, as long as both the log and values are of the same semigroup.
+
+
+//setoid
+Tuple.prototype.equals = function(wr){
+  return this[0]===wr[0] && this[1]===wr[1];
+}
+
+//???
+Tuple.prototype.sequence = function(of){
+  return of(this[1].chain(x=>Tuple(this[0],x)));
+}
+
+module.exports = Tuple;
+},{}],9:[function(require,module,exports){
 function Writer(l, v) {
   if (!(this instanceof Writer)) {
     return new Writer(l,v);
@@ -369,6 +419,8 @@ Writer.prototype.ap = function(wr){
 }
 Writer.prototype.fst = function(){return this[0]};
 Writer.prototype.snd = function(){return this[1]};
+Writer.prototype.swap = function(){return Writer(this[1],this[0])};
+
 
 const writerize = Writer.lift = (log, fn) => x => Writer(log, fn(x));
 
@@ -391,7 +443,7 @@ Writer.prototype.sequence = function(of){
 }
 
 module.exports = Writer;
-},{}],9:[function(require,module,exports){
+},{}],10:[function(require,module,exports){
 const compose  = (fn, ...rest) =>
   rest.length === 0 ?
     (fn||(x=>x)) :
@@ -413,7 +465,7 @@ module.exports = {
   liftA2,
   liftA3
 }
-},{}],10:[function(require,module,exports){
+},{}],11:[function(require,module,exports){
 (function (global){
 const {curry}  = require('../../src/other-types/pointfree.js');
 
@@ -437,4 +489,4 @@ module.exports = {
   andLog
 };
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{"../../src/other-types/pointfree.js":9}]},{},[1]);
+},{"../../src/other-types/pointfree.js":10}]},{},[1]);
