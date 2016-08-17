@@ -5,13 +5,13 @@ const Nothing = (function(){
   Nothing.prototype.ap = Nothing.prototype.chain = Nothing.prototype.map = Nothing.prototype.filter = function(){ return this; };
   Nothing.prototype.sequence = function(of){ return of(this); };//flips Nothing insde a type, i.e.: Type[Nothing]
   Nothing.prototype.traverse = function(fn, of){ return of(this); };//same as above, just ignores the map fn
-  Nothing.prototype.reduce = (f, x) => x,//binary function is ignored, the accumulator returned
+  Nothing.prototype.reduce = Nothing.prototype.fold = (f, x) => x,//binary function is ignored, the accumulator returned
   Nothing.prototype.getOrElse = Nothing.prototype.orElse = Nothing.prototype.concat = x => x;//just returns the provided value
   Nothing.prototype.cata = ({Nothing}) => Nothing();  //not the Nothing type constructor here, btw, a prop named "Nothing" defining a nullary function!
   Nothing.prototype.equals = function(y){return y==this;};//setoid
   Nothing.prototype.toString = _ => 'Nothing';
   Nothing.prototype.toBoolean = _ => false;//reduce a Nothing to false
-  Nothing.prototype[Symbol.toPrimitive] = function(hint){ return hint=='string' ? "" : 0; };//define some behavior for coercion: empty string for string coercion, 0 for number coercion
+  //Nothing.prototype[Symbol.toPrimitive] = function(hint){ return hint=='string' ? "" : 0; };//define some behavior for coercion: empty string for string coercion, 0 for number coercion
   Nothing.prototype.toJSON = _ => '{"type":"Maybe.Nothing"}';
 
   return new Nothing();
@@ -32,7 +32,7 @@ Just.prototype.chain = function(f){ return f(this.value); };//transform the inne
 Just.prototype.sequence = function(of){ return this.value.map(Just); };//flip an inner type with the outer Just
 Just.prototype.traverse = function(fn, of){ return this.map(fn).sequence(of); };//transform the inner value (resulting in an inner type) then flip that type outside
 Just.prototype.toString = function(){ return `Just[${this.value}]`; };
-Just.prototype.reduce = function(fn, acc) { return fn(acc, this.value); };//binary function + accumulator
+Just.prototype.reduce = Just.prototype.fold = function(fn, acc) { return fn(this.value); };//binary function is run, accumulator ignored
 Just.prototype.filter = function(fn){ return this.chain(x=> fn(x)? this : Nothing ); };//test the inner value with a function
 
 //assuming that the inner value has a concat method, concat it with another Just. Falls back to + for strings and numbers
@@ -40,7 +40,7 @@ Just.prototype.concat = function(b){
   return b.value && !Maybe.isNull(b.value) ? Just(this.value.concat ? this.value.concat(b.value) : this.value + b.value) : this 
 };
 Just.prototype.equals = function(y){ return y.value === this.value; };//strictly compare the inner values
-Just.prototype[Symbol.toPrimitive] = Just.prototype.getOrElse = function(){ return this.value; };//extract the inner value when forcibly coerced to deliver a value
+//Just.prototype[Symbol.toPrimitive] = Just.prototype.getOrElse = function(){ return this.value; };//extract the inner value when forcibly coerced to deliver a value
 Just.prototype.orElse = function(){ return this; }//does nothing in the Just case
 Just.prototype.cata = function({Just}){ return Just(this.value) };//calls the function defined in prop "Just" with the inner value
 Just.prototype.toBoolean = _ => true;//reduce a Just to true. Useful in filters

@@ -73,10 +73,10 @@ Just([4]).sequence(Array.of).filter(x => !4).sequence(Maybe.of).concat(Just([6])
 [2,3].map(mockApi).filter(Maybe.toBoolean).reduceRight( (acc, x) => x, Nothing);//-> Nothing
 
 Array.of(Just([4]));//-> ew, a type within type within type! [Just[[4]]]
-Array.of(Just([4])).sequence(Just);//-> flip the outer two layers: Just[[[4]]]
-Array.of(Just([4])).sequence(Just).map(x=>x.flatten());//-> flatten out the inner arrays: Just[[4]]
-Array.of(Just([4])).sequence(Just).map(x=>x.flatten()).map(x=>x[0]);//-> grab the first inner element: Just[4]
-Array.of(Just([4])).sequence(Just).map(x=>x.flatten()).map(x=>x[0]).getOrElse(null);//-> extract the value w/ fallback:  4
+Array.of(Just([4])).sequence(Maybe.of);//-> flip the outer two layers: Just[[[4]]]
+Array.of(Just([4])).sequence(Maybe.of).map(x=>x.flatten());//-> flatten out the inner arrays: Just[[4]]
+Array.of(Just([4])).sequence(Maybe.of).map(x=>x.flatten()).map(x=>x[0]);//-> grab the first inner element: Just[4]
+Array.of(Just([4])).sequence(Maybe.of).map(x=>x.flatten()).map(x=>x[0]).getOrElse(null);//-> extract the value w/ fallback:  4
 
 [1,2].traverse(actualApi, Promise.of);//-> Promise[[result, result]] Array of promises becomes a promise of Arrays
 ```

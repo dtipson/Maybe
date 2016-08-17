@@ -37,4 +37,9 @@ Writer.prototype.equals = function(wr){
   return this[0]===wr[0] && this[1]===wr[1];
 }
 
+
+Writer.prototype.sequence = function(of){
+  return of(this[1].chain(x=>Writer(this[0],x)));
+}
+
 module.exports = Writer;

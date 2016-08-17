@@ -1,3 +1,4 @@
+Array.empty = _ => [];
 Array.prototype.flatten = function(){return [].concat(...this); };
 //we need to guard the f against the extra args that native Array.map passes to avoid silly results
 Array.prototype.chain = function(f){
