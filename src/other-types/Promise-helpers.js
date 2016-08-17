@@ -55,7 +55,7 @@ Promise.prototype.fold = Promise.prototype.then;//is it really?
 
 //I think this might still be correct, maybe?
 Promise.prototype.ap = function(p2){
-  return Promise.all([this,p2]).then(([fn,x])=>fn(x));
+  return Promise.all([this, p2]).then(([fn, x]) => fn(x));
 }
 //are these actually possible? in theory an applicative should be, but what would it even mean? How could you get a # of array items out? You can't know how many there would be until it resolves...
 // Promise.prototype.sequence_no = function(point){
@@ -129,16 +129,11 @@ Promise.prototype.enterChallengers = function(arr){
 
 //???? just copied over from Task
 Promise.prototype.orElse = function _orElse(f) {
-  var fork = this.fork;
-  var cleanup = this.cleanup;
-
-  return new Task(function(reject, resolve) {
-    return fork(function(a) {
-      return f(a).fork(reject, resolve);
-    }, function(b) {
-      return resolve(b);
+  return new Promise(function(resolve, reject) {
+    return this.then(null,function(a) {
+      return f(a).then(resolve, reject);
     });
-  }, cleanup);
+  });
 };
 
 
