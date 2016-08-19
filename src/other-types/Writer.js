@@ -2,11 +2,11 @@ function Writer(l, v) {
   if (!(this instanceof Writer)) {
     return new Writer(l,v);
   }
-  this[0] = String(l||'').trim();//log
+  this[0] = String(l).trim();//log
   this[1] = v;//value
 }
 
-Writer.of = (x) => new Writer(x, x);
+Writer.of = (x) => new Writer('', x);
 Writer.prototype.of = Writer.of;
 
 Writer.prototype.chain = function(f){

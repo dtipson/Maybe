@@ -2,19 +2,22 @@
 require('./src/other-types/Array-helpers.js');
 require('./src/other-types/Promise-helpers.js');
 const Const = require('./src/other-types/Const.js');
+const Continuation = require('./src/other-types/Continuation.js');
+const Identity = require('./src/other-types/Identity.js');
 const Writer = require('./src/other-types/Writer.js');
 const Tuple = require('./src/other-types/Tuple.js');
 const Reader = require('./src/other-types/Reader.js');
+const State = require('./src/other-types/State.js');
 const IO = require('./src/other-types/IO.js');
 
 Object.assign(
   window, 
   require('./src/Maybe.js'),
-  {Const,Reader,Writer,IO,Tuple},
+  {Const,Reader,Writer,IO,Tuple,Identity,State,Continuation},
   require('./src/other-types/pointfree.js'),
   require('./src/other-types/utility.js')
 );
-},{"./src/Maybe.js":2,"./src/other-types/Array-helpers.js":3,"./src/other-types/Const.js":4,"./src/other-types/IO.js":5,"./src/other-types/Promise-helpers.js":6,"./src/other-types/Reader.js":7,"./src/other-types/Tuple.js":8,"./src/other-types/Writer.js":9,"./src/other-types/pointfree.js":10,"./src/other-types/utility.js":11}],2:[function(require,module,exports){
+},{"./src/Maybe.js":2,"./src/other-types/Array-helpers.js":3,"./src/other-types/Const.js":4,"./src/other-types/Continuation.js":5,"./src/other-types/IO.js":6,"./src/other-types/Identity.js":7,"./src/other-types/Promise-helpers.js":8,"./src/other-types/Reader.js":9,"./src/other-types/State.js":10,"./src/other-types/Tuple.js":11,"./src/other-types/Writer.js":12,"./src/other-types/pointfree.js":13,"./src/other-types/utility.js":14}],2:[function(require,module,exports){
 //We only ever need one "Nothing" so we'll define the type, create the one instance, and return it. We could have just created an object with 
 //all these methods on it, but then it wouldn't log as nicely/clearly
 const Nothing = (function(){
@@ -121,7 +124,6 @@ Const.prototype.map = function() {
 
 module.exports = Const;
 
-
 /*
 
   reduce is then 
@@ -135,6 +137,57 @@ module.exports = Const;
 
 */
 },{}],5:[function(require,module,exports){
+//monad for specifying the value transformation last maybe?  the value is a "resuming" function
+//https://gist.github.com/tel/9a34caf0b6e38cba6772
+//http://www.haskellforall.com/2012/12/the-continuation-monad.html for when you want to write a computation that specifies some critical operation later/externally?
+/*
+Whoa:
+Our strategy works well if we have exactly one hole in our function, but what if we have two holes in our function, each of which takes a different argument?
+Fortunately, there is a clean and general solution. Just define a data type that wraps both possible arguments in a sum type, and just define a single continuation that accepts this sum type:
+//The continuation monad teaches us that we can always condense a sprawling API filled with callbacks into a single callback that takes a single argument.
+*/
+
+function Continuation(contHandler) {
+  if (!(this instanceof Continuation)) {
+    return new Continuation(contHandler);
+  }
+  this.contHandler = contHandler;
+};
+
+Continuation.of = function(value) {
+  return new Continuation(cont => cont(value));
+};
+
+Continuation.prototype.run = function(resume) {
+  return this.contHandler(resume);
+};
+
+Continuation.prototype.escape = function() {
+  return this.run(x=>x);
+};
+
+Continuation.prototype.doNothing = function () {
+  return new Continuation(resume => this.run(value => resume(value)) );
+};
+
+Continuation.prototype.doNothing = function () {
+  return new Continuation(resume => this.run(resume) );
+};
+
+Continuation.prototype.chain = function (transform) {
+  return new Continuation(resume => this.run(value => transform(value).run(resume)) );
+};
+
+Continuation.prototype.map = function (fn) {
+  return this.chain(v => Continuation.of(fn(v)) );
+};
+
+Continuation.prototype.ap = function(app2) {
+  return this.chain(fn => app2.chain(app2value => Continuation.of(fn(app2value)) ) );
+};
+
+module.exports = Continuation;
+},{}],6:[function(require,module,exports){
 function IO(fn) {
   if (!(this instanceof IO)) {
     return new IO(fn);
@@ -162,7 +215,39 @@ IO.prototype.map = function(f) {
 };
 
 module.exports = IO;
-},{}],6:[function(require,module,exports){
+},{}],7:[function(require,module,exports){
+function Identity(v) {
+  if (!(this instanceof Identity)) {
+    return new Identity(v);
+  }
+  this.value = v;
+}
+
+Identity.prototype.of = x => new Identity(x);
+Identity.of = Identity.prototype.of;
+
+Identity.prototype.map = function(f) {
+  return new Identity(f(this.value));
+};
+Identity.prototype.ap = function(app) {
+  return app.map(this.value);
+};
+Identity.prototype.sequence = function(of){
+  return this.value.map(Identity.of); 
+};
+Identity.prototype.chain = function(f) {
+  return f(this.value);
+};
+Identity.prototype.get = function() {
+  return this.value;
+};
+Identity.prototype.equals = function(that){
+  return that instanceof Identity && that.value === this.value;
+};
+
+
+module.exports = Identity;
+},{}],8:[function(require,module,exports){
 Promise.prototype.of = Promise.resolve;
 Promise.of = x => Promise.resolve(x);
 Promise.prototype.map = Promise.prototype.chain = Promise.prototype.then;
@@ -171,66 +256,10 @@ Promise.prototype.fold = Promise.prototype.then;//is it really?
 //Yes: Promise.reject(9).fold(x=>acc+1, x=>x+1)->P10 Promises hold only one value
 //not sure if tasks turn reject into a resolve like this tho
 
-//mostly a copy of the parallelization logic that was necessary for folktale's Task.ap. Promise.race already gives this to us
-// Promise.prototype.ap = function(that){
-//   return new Promise((resolve, reject) => {
-//     let func, 
-//         funcLoaded = false,
-//         val, 
-//         valLoaded = false,
-//         rejected = false,
-//         allState;
-
-//     const guardReject = x => {
-//       if (!rejected){
-//         rejected = true;
-//         return reject(x);
-//       }
-//     };
-
-//     const guardResolve = setter => x => {
-//       if (rejected) {
-//         return;
-//       }
-
-//       setter(x);
-
-//       if (funcLoaded && valLoaded) {
-//         return resolve(func(val));
-//       } else {
-//         return x;
-//       }
-//     };
-
-//     const guardThis = guardResolve(fn => {
-//       funcLoaded = true;
-//       func = fn;
-//     });
-
-//     const guardThat = guardResolve(x => {
-//       valLoaded = true;
-//       val = x;
-//     });
-
-//     const thisState = this.then(guardThis, guardReject)
-//     const thatState = that.then(guardThat, guardReject);
-
-//   });
-// };
-
 //I think this might still be correct, maybe?
 Promise.prototype.ap = function(p2){
-  return Promise.all([this,p2]).then(([fn,x])=>fn(x));
+  return Promise.all([this, p2]).then(([fn, x]) => fn(x));
 }
-//are these actually possible? in theory an applicative should be, but what would it even mean? How could you get a # of array items out? You can't know how many there would be until it resolves...
-// Promise.prototype.sequence_no = function(point){
-//   return point().concat(this.map);//.concat(this.map(x=>x.map()))
-// };
-// Promise.prototype.traverse_no = function(f, point){
-//   return this.map(f).sequence(point);
-// };
-
-
 
 //create a Promise that will never resolve
 Promise.empty = function _empty() {
@@ -242,74 +271,42 @@ Promise.prototype.concat = function(that){
  return Promise.race([this,that]);
 };
 
-//first _resolving_ promise wins, otherwise the first rejecting
-//seems to work? What is it called tho?
-Promise.prototype.concat2 = function(that){
+//the first _resolving_ promise wins, otherwise the first rejecting
+Promise.prototype.hopefulConcat = function(that){
   return Promise.race([this,that]).catch(
   e => {
-    console.log('one rejected');
     let resolved = {};
     return this.then(a=>{
       resolved = this;
-      console.log('this resolved');
       return a;
     },b=>{
       return that.then(c=>{
         resolved = that;
-        console.log('that resolved');
         return c;
       });
     }).then(x=> resolved.then ? resolved : Promise.reject(e), x=>Promise.reject(e));
   });
 };
 
-Promise.prototype.challenge = function(arr){
+//just a reduce using concat2, takes the first to resolve, or first to reject once all have rejected
+Promise.prototype.enterChallengers = function(arr){
   return arr.reduce((acc,x) => acc.concat2(x), this);
 }
 
 
-//Task's version
-/*function _concat(that) {
-  var forkThis = this.fork;
-  var forkThat = that.fork;
-
-  return new Promise(function(resolve, reject) {
-    var done = false;
-    var allState;
-    var thisState = forkThis(guard(reject), guard(resolve));
-    var thatState = forkThat(guard(reject), guard(resolve));
-
-    function guard(f) {
-      return function(x) {
-        if (!done) {
-          done = true;
-          return f(x);
-        }
-      };
-    }
-  });
-
-};
-*/
-
 //???? just copied over from Task
 Promise.prototype.orElse = function _orElse(f) {
-  var fork = this.fork;
-  var cleanup = this.cleanup;
-
-  return new Task(function(reject, resolve) {
-    return fork(function(a) {
-      return f(a).fork(reject, resolve);
-    }, function(b) {
-      return resolve(b);
+  return new Promise(function(resolve, reject) {
+    return this.then(null,function(a) {
+      return f(a).then(resolve, reject);
     });
-  }, cleanup);
+  });
 };
 
 
 
 
-},{}],7:[function(require,module,exports){
+},{}],9:[function(require,module,exports){
 function Reader(run) {
   if (!(this instanceof Reader)) {
     return new Reader(run);
@@ -346,7 +343,94 @@ Reader.ask = Reader(x=>x);//ask allows you to inject the/a runtime depedency int
 Reader.binary = fn => x => Reader.ask.map(y => fn(y, x));
 
 module.exports = Reader;
-},{}],8:[function(require,module,exports){
+},{}],10:[function(require,module,exports){
+const {curry}  = require('../../src/other-types/pointfree.js');
+
+var Identity = require('./Identity');
+var Tuple = require('./Tuple');
+var {deriveAp, deriveMap} = require('./utility');
+
+
+function T(M) {
+  function StateT(run) {
+    if (!(this instanceof StateT)) {
+      return new StateT(run);
+    }
+    this._run = run;
+  }
+  StateT.prototype.run = function(s) {
+    return this._run(s);
+  };
+  StateT.prototype.eval = function(s) {
+    return Tuple.fst(this.run(s));
+  };
+  StateT.prototype.exec = function(s) {
+    return Tuple.snd(this.run(s));
+  };
+  StateT.prototype.chain = function(f) {
+    var state = this;
+    return StateT(function(s) {
+      return state._run(s).chain(function(t) {
+        return f(Tuple.fst(t))._run(Tuple.snd(t));
+      });
+    });
+  };
+  StateT.of = StateT.prototype.of = function(a) {
+    return StateT(function (s) {
+      return M.of(Tuple(a, s));
+    });
+  };
+  StateT.prototype.ap = deriveAp(StateT);
+  StateT.prototype.map = deriveMap(StateT);
+  StateT.tailRec = curry(function(stepFn, init) {
+    return StateT(function(s) {
+      return M.tailRec(function(t) {
+        return stepFn(Tuple.fst(t))._run(Tuple.snd(t)).chain(function (t_) {
+          return M.of(Tuple.fst(t_).bimap(
+            function(a) { return Tuple(a, Tuple.snd(t_)); },
+            function(b) { return Tuple(b, Tuple.snd(t_)); }
+          ));
+        });
+      }, Tuple(init, s));
+    });
+  });
+  StateT.lift = function(ma) {
+    return StateT(function(s) {
+      return ma.chain(function(a) {
+        return M.of(Tuple(a, s));
+      });
+    });
+  };
+  StateT.get = StateT(function(s) {
+    return M.of(Tuple(s, s));
+  });
+  StateT.gets = function(f) {
+    return StateT(function(s) {
+      return M.of(Tuple(f(s), s));
+    });
+  };
+  StateT.put = function(s) {
+    return StateT(function(_) {
+      return M.of(Tuple(void _, s));
+    });
+  };
+  StateT.modify = function(f) {
+    return StateT(function(s) {
+      return M.of(Tuple(void 0, f(s)));
+    });
+  };
+
+  return StateT;
+}
+
+var State = T(Identity);
+State.T = T;
+State.prototype.run = function(s) {
+  return this._run(s).value;
+};
+
+module.exports = State;
+},{"../../src/other-types/pointfree.js":13,"./Identity":7,"./Tuple":11,"./utility":14}],11:[function(require,module,exports){
 function Tuple(x, y) {
   if (!(this instanceof Tuple)) {
     return new Tuple(x,y);
@@ -359,18 +443,17 @@ function Tuple(x, y) {
 Tuple.of = x => y => new Tuple(x, y);
 Tuple.prototype.of = Tuple.of;
 
-Tuple.prototype.chain = function(f){
-  const tuple = f(this[1]);
-  return new Tuple(this[0].concat(' ',tuple[0]), tuple[1]);
-}
 Tuple.prototype.map = function(f){
   return new Tuple( this[0], f(this[1]) );
 }
 Tuple.prototype.ap = function(wr){
-  return Tuple( this[0].concat(' ', wr[0]), this[1](wr[1]) );
+  return Tuple( this[0].concat(wr[0]), this[1](wr[1]) );
 }
 Tuple.prototype.fst = function(){return this[0]};
 Tuple.prototype.snd = function(){return this[1]};
+Tuple.fst = tuple => tuple[0];
+Tuple.snd = tuple => tuple[1];
+
 Tuple.prototype.swap = function(){return Tuple(this[1],this[0])};
 
 
@@ -379,7 +462,7 @@ const Tupleize = Tuple.lift = (xval, yfn) => x => Tuple(xval, yfn(x));
 
 //semigroup
 Tuple.prototype.concat = function(wr){
-  return Tuple( this[0].concat(' ', wr[0]), this[1].concat(wr[1]) );
+  return Tuple( this[0].concat(wr[0]), this[1].concat(wr[1]) );
 }
 //allows merging of Tuples, as long as both the log and values are of the same semigroup.
 
@@ -395,16 +478,16 @@ Tuple.prototype.sequence = function(of){
 }
 
 module.exports = Tuple;
-},{}],9:[function(require,module,exports){
+},{}],12:[function(require,module,exports){
 function Writer(l, v) {
   if (!(this instanceof Writer)) {
     return new Writer(l,v);
   }
-  this[0] = String(l||'').trim();//log
+  this[0] = String(l).trim();//log
   this[1] = v;//value
 }
 
-Writer.of = (x) => new Writer(x, x);
+Writer.of = (x) => new Writer('', x);
 Writer.prototype.of = Writer.of;
 
 Writer.prototype.chain = function(f){
@@ -443,7 +526,7 @@ Writer.prototype.sequence = function(of){
 }
 
 module.exports = Writer;
-},{}],10:[function(require,module,exports){
+},{}],13:[function(require,module,exports){
 const compose  = (fn, ...rest) =>
   rest.length === 0 ?
     (fn||(x=>x)) :
@@ -465,7 +548,7 @@ module.exports = {
   liftA2,
   liftA3
 }
-},{}],11:[function(require,module,exports){
+},{}],14:[function(require,module,exports){
 (function (global){
 const {curry}  = require('../../src/other-types/pointfree.js');
 
@@ -479,6 +562,15 @@ const tapDelayR = curry((ms,x) => new Promise((resolve, reject) => global.setTim
 const log = x => !console.log(x) && x;
 const andLog = (...comments) => x => !console.log(x, ...comments) && x;
 
+const deriveMap = Applicative => function (fn) {
+  return this.chain(value => Applicative.of(fn(value)) );
+};
+
+const deriveAp = Applicative => function(app2) {
+  return this.chain(fn => app2.chain(app2value => Applicative.of(fn(app2value)) ) );
+};
+
+
 
 module.exports = {
   delay,
@@ -486,7 +578,9 @@ module.exports = {
   tapDelay,
   tapDelayR,
   log,
-  andLog
+  andLog,
+  deriveMap,
+  deriveAp
 };
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{"../../src/other-types/pointfree.js":10}]},{},[1]);
+},{"../../src/other-types/pointfree.js":13}]},{},[1]);

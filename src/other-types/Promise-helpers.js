@@ -25,16 +25,13 @@ Promise.prototype.concat = function(that){
 Promise.prototype.hopefulConcat = function(that){
   return Promise.race([this,that]).catch(
   e => {
-    console.log('one rejected');
     let resolved = {};
     return this.then(a=>{
       resolved = this;
-      console.log('this resolved');
       return a;
     },b=>{
       return that.then(c=>{
         resolved = that;
-        console.log('that resolved');
         return c;
       });
     }).then(x=> resolved.then ? resolved : Promise.reject(e), x=>Promise.reject(e));

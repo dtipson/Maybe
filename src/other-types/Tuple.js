@@ -18,6 +18,9 @@ Tuple.prototype.ap = function(wr){
 }
 Tuple.prototype.fst = function(){return this[0]};
 Tuple.prototype.snd = function(){return this[1]};
+Tuple.fst = tuple => tuple[0];
+Tuple.snd = tuple => tuple[1];
+
 Tuple.prototype.swap = function(){return Tuple(this[1],this[0])};
 
 

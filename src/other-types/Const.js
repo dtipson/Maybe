@@ -12,7 +12,6 @@ Const.prototype.map = function() {
 
 module.exports = Const;
 
-
 /*
 
   reduce is then 

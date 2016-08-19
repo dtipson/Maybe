@@ -10,6 +10,15 @@ const tapDelayR = curry((ms,x) => new Promise((resolve, reject) => global.setTim
 const log = x => !console.log(x) && x;
 const andLog = (...comments) => x => !console.log(x, ...comments) && x;
 
+const deriveMap = Applicative => function (fn) {
+  return this.chain(value => Applicative.of(fn(value)) );
+};
+
+const deriveAp = Applicative => function(app2) {
+  return this.chain(fn => app2.chain(app2value => Applicative.of(fn(app2value)) ) );
+};
+
+
 
 module.exports = {
   delay,
@@ -17,5 +26,7 @@ module.exports = {
   tapDelay,
   tapDelayR,
   log,
-  andLog
+  andLog,
+  deriveMap,
+  deriveAp
 };
