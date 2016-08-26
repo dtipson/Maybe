@@ -8,7 +8,7 @@ Just because this library does it doesn't mean it's right, or a good idea.  This
 
 The main lib exports `Maybe`, `Nothing`, & `Just`
 
-The extended lib (also available on the index page) implements `Cont, Const, Either, Identity, IO, Maybe, Reader, State (&T), Tuple, & Writer`
+The extended lib (also available on the index page) implements `Cont, Const, Either, Identity, IO, Maybe, Reader, State (&T), Tuple, & Writer`.  It also enhances Array and Promise to make them conform to [fantasy-land](https://github.com/fantasyland/fantasy-land)
 
 ```
 Just(5).getOrElse(4);//-> 5
@@ -29,27 +29,32 @@ Just(9).map(x=>y=>x+y).ap(Just(9));//-> Just[18]
 Just(9).chain(x=>Just(9).chain(y=>x+y));//-> Just[18]
 Just(x=>y=>x+y).ap(Just(9)).ap(Just(9));//-> Just[18]
 liftA2(x=>y=>x+y, Just(9),Just(9));//-> Just[18]
+
+//And if you happen to include a Nothing somewhere...
 Nothing.chain(x=>Just(9).chain(y=>x+y));//-> Nothing
 
-
-//Nothing can be treated as false
+//a Nothing can be treated as false
 Boolean(Number(Nothing));//-> false
 Nothing.toBoolean();//-> false
 
-//Justs are always treated as true
+//...while Justs are always treated as true
 Just(undefined).toBoolean();//-> true
 
+//there are ways to resolve the ambiguity of Just/Nothing
 Nothing.orElse(Just(9));//-> Just[9]
 
-Maybe.maybe(8, x=>x+1, Just(7));//-> 8
-Maybe.maybe(8, x=>x+1, Nothing);//-> 8
+//There are ways to fold types into a value
+maybe(8, x=>x+1, Just(7));//-> 8
+maybe(8, x=>x+1, Nothing);//-> 8
 
+
+//the utility of the Type is the ability to emit the lack of a value without breaking composition...
 const mockApi = id => id===1 ? Just({record:1}) : Nothing;
 
 mockApi(2).map(x=>window.alert(x));//-> nothing happens
 mockApi(1).map(x=>window.alert(x));//-> alerts {record:1}
 
-//or, with Array/Promise prototype extension helpers added, some type gymnastics
+//or, with Array/Promise prototype extension helpers added... let's do some type gymnastics!
 
 [Just(4),Nothing,Just(5)].filter(x => x.toBoolean());//-> [Just[4],Just[5]]
 [Just(4),Nothing,Just(5)].filter(Maybe.toBoolean).sequence(Maybe.of);//-> Just[[4,5]]
