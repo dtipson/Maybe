@@ -1,3 +1,61 @@
+//lots of similarities here to Task, which is a sort of this married to an Either
+//fork and handler are very similar: computation doesn't run until fork is calleds
+
+function Continuation(fork) {
+  if (!(this instanceof Continuation)) {
+    return new Continuation(fork);
+  }
+  this.fork = fork;
+};
+
+Continuation.of = function(value) {
+  return new Continuation(resume => resume(value));
+};
+
+Continuation.prototype.chain = function(fn) {
+  return new Continuation(resume => this.fork(value => fn(value).fork(resume)) );
+};
+
+// Continuation.prototype.map = function (fn) {
+//   return new Continuation(resume => this.fork(b => resume(fn(b)) ) );
+// };
+Continuation.prototype.map = function (fn) {
+  return this.chain(v => Continuation.of(fn(v)) );
+};
+
+Continuation.prototype.ap = function(app2) {
+  return this.chain(fn => app2.chain(app2value => Continuation.of(fn(app2value)) ) );
+};
+
+Continuation.ask = Continuation(x=>x);
+
+Continuation.fill = value => Continuation.ask.map(resume => resume(value)).fork();
+
+Continuation.prototype.fork = function(resume) {
+  return this.fork(resume);
+};
+
+Continuation.prototype.escape = function() {
+  return this.fork(x=>x);
+};
+
+Continuation.prototype.doNothing = function () {
+  return new Continuation(resume => this.fork(value => resume(value)) );
+};
+//or?
+Continuation.prototype.doNothing = function () {
+  return new Continuation(resume => this.fork(resume) );
+};
+
+
+
+
+
+const Cont = Continuation;//alias
+
+module.exports = Continuation;
+
+
 //monad for specifying the value transformation last maybe?  the value is a "resuming" function
 //https://gist.github.com/tel/9a34caf0b6e38cba6772
 //http://www.haskellforall.com/2012/12/the-continuation-monad.html for when you want to write a computation that specifies some critical operation later/externally?
@@ -8,43 +66,58 @@ Fortunately, there is a clean and general solution. Just define a data type that
 //The continuation monad teaches us that we can always condense a sprawling API filled with callbacks into a single callback that takes a single argument.
 */
 
-function Continuation(contHandler) {
-  if (!(this instanceof Continuation)) {
-    return new Continuation(contHandler);
-  }
-  this.contHandler = contHandler;
-};
+/*
+function unit(a) {
+    return function(k) {
+        return k(a);
+    };
+}
 
-Continuation.of = function(value) {
-  return new Continuation(cont => cont(value));
-};
+function bind(ma, f) {
+    return function(k) {
+        return ma(function(a) {
+            return f(a)(k);
+        });
+    };
+}
 
-Continuation.prototype.run = function(resume) {
-  return this.contHandler(resume);
-};
+function doCont() {
+    var args = Array.prototype.slice.apply(arguments);
+    return function(k) {
+        var f = args.shift();
+        while (args.length > 0) {
+            f = bind(f, args.shift());
+        }
+        return f(k);
+    };
+}
 
-Continuation.prototype.escape = function() {
-  return this.run(x=>x);
-};
+function call_cc(f) {
+    return function(a) {
+        return function(k) { return f(a, k); };
+    };
+}
 
-Continuation.prototype.doNothing = function () {
-  return new Continuation(resume => this.run(value => resume(value)) );
-};
+function lift(f) {
+    return call_cc(function(a, k) { return k(f(a)); });
+}
 
-Continuation.prototype.doNothing = function () {
-  return new Continuation(resume => this.run(resume) );
-};
+function addEachOf() {
+    var args = arguments;
+    return call_cc(function(a, k) {
+        var i;
+        for (i=0; i<args.length; i++) {
+            k(a + args[i]);
+        }
+    });
+}
 
-Continuation.prototype.chain = function (transform) {
-  return new Continuation(resume => this.run(value => transform(value).run(resume)) );
-};
+function alertMe(message) { alert(message); }
 
-Continuation.prototype.map = function (fn) {
-  return this.chain(v => Continuation.of(fn(v)) );
-};
+doCont(
+    unit("goodbye cruel "),
+    addEachOf("world", "fate", "mistress"),
+    lift(function(a) { return a.toUpperCase(); })
+)(alertMe);
 
-Continuation.prototype.ap = function(app2) {
-  return this.chain(fn => app2.chain(app2value => Continuation.of(fn(app2value)) ) );
-};
-
-module.exports = Continuation;
+*/

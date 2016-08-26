@@ -18,6 +18,24 @@ const deriveAp = Applicative => function(app2) {
   return this.chain(fn => app2.chain(app2value => Applicative.of(fn(app2value)) ) );
 };
 
+//write monadic operations in do notation using generators
+const doM = gen => {
+    function step(value) {
+        var result = gen.next(value);
+        if (result.done) {
+            return result.value;
+        }
+        return result.value.chain(step);
+    }
+    return step();
+};
+/*
+var result = doM(function*() {
+    var value = yield Nothing;
+    var value2 = yield Maybe.of(11);
+    return value + value2;
+}());
+*/
 
 
 module.exports = {
@@ -28,5 +46,6 @@ module.exports = {
   log,
   andLog,
   deriveMap,
-  deriveAp
+  deriveAp,
+  doM
 };

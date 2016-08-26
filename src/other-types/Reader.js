@@ -32,5 +32,6 @@ Reader.ask = Reader(x=>x);//ask allows you to inject the/a runtime depedency int
 
 //silly helper
 Reader.binary = fn => x => Reader.ask.map(y => fn(y, x));
+Reader.exec = x => Reader.ask.map(fn => fn(x));
 
 module.exports = Reader;

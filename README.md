@@ -17,12 +17,18 @@ Just(3).cata({
   Nothing: () => Just(4)
 });//-> 4
 
+Nothing.cata({
+  Just: x => Just(x+1),
+  Nothing: () => Just(4)
+});//-> 4
 
-//implicit coercions to string or number 
-`Hi ${Just('Guy')}`;//-> "Hi Guy"
-`Hi ${Nothing}`;//-> "Hi"
-Nothing+4;//-> 4
-Just(5)+4//-> 9
+//all the which ways you might find the need to add two Justs to a binary function
+Just(9).map(x=>y=>x+y).ap(Just(9));//-> Just[18]
+Just(9).chain(x=>Just(9).chain(y=>x+y));//-> Just[18]
+Just(x=>y=>x+y).ap(Just(9)).ap(Just(9));//-> Just[18]
+liftA2(x=>y=>x+y, Just(9),Just(9));//-> Just[18]
+Nothing.chain(x=>Just(9).chain(y=>x+y));//-> Nothing
+
 
 //Nothing can be treated as false
 Boolean(Number(Nothing));//-> false
@@ -81,3 +87,14 @@ Array.of(Just([4])).sequence(Maybe.of).map(x=>x.flatten()).map(x=>x[0]).getOrEls
 [1,2].traverse(actualApi, Promise.of);//-> Promise[[result, result]] Array of promises becomes a promise of Arrays
 ```
 
+Hell...
+
+```
+[IO.of(9),IO.of(7)].sequence(IO.of).runUnsafe();//-> [9,7]
+
+
+
+Continuation.of(1).run(x=>x+1) + Continuation(x=>x+1).run(1);//-> 4
+Promise.all([Promise.of(x=>x+1).ap(Promise.of(1)),Promise.of(1).map(x=>x+1)]).then(([x,y])=>x+y);//->Promise[4]
+
+```

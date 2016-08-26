@@ -9,8 +9,8 @@ test('Identity', function (t) {
   const I = x=>x;
   const functor = Maybe.of(5)
 
-  const left = functor.map(I);
-  const right = functor;
+  const left = functor.map(I);//base functor .map() with Identity
+  const right = functor;//base functor
 
   t.same(left, right, 'function with no effect returns functor with the same internal value');
   t.end();

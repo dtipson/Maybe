@@ -11,13 +11,13 @@ test('null & undefined are falsy', function (t) {
 });
 
 
-test('coercion', function (t) {
-  t.equals(`${Nothing}1`, '1', 'Nothing coerces into a String');
-  t.equals(String(Nothing), '', 'Nothing coerces into a String');
-  t.equals(Nothing+0, 0, 'Nothing coerces into Numbers');
-  t.equals(Nothing+1, 1, 'Nothing coerces into Numbers');
+// test('coercion', function (t) {
+//   t.equals(`${Nothing}1`, '1', 'Nothing coerces into a String');
+//   t.equals(String(Nothing), '', 'Nothing coerces into a String');
+//   t.equals(Nothing+0, 0, 'Nothing coerces into Numbers');
+//   t.equals(Nothing+1, 1, 'Nothing coerces into Numbers');
 
-  t.equals(Just(9)+1, 10, 'Just coerces out the value (number)');
-  t.equals(Just("hi")+" there", "hi there", 'Just out the value (string)');
-  t.end();
-});
+//   t.equals(Just(9)+1, 10, 'Just coerces out the value (number)');
+//   t.equals(Just("hi")+" there", "hi there", 'Just out the value (string)');
+//   t.end();
+// });

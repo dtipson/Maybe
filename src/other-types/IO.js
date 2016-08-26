@@ -12,16 +12,23 @@ IO.of = IO.prototype.of;
 IO.prototype.chain = function(f) {
   return IO(() => f(this.runUnsafe()).runUnsafe() );
 };
+//operations sequenced in next stack?
 IO.prototype.fork = function(f) {
   return IO(() => window.setTimeout(()=>this.runUnsafe(),0) );
 };
 
 IO.prototype.ap = function(a) {
-  return this.chain((f) => a.map(f));
+  return this.chain( f => a.map(f));
 };
 
 IO.prototype.map = function(f) {
-  return this.chain((a) => IO.of(f(a)) );
+  return this.chain( a => IO.of(f(a)) );
 };
+
+//?unproven/maybe not possible?
+IO.prototype.sequence = function(of) {
+  return of(this.map());
+};
+
 
 module.exports = IO;
