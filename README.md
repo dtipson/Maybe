@@ -3,10 +3,11 @@ Quick, instructional implementation of the Maybe Type in FP javascript, with tes
 
 `npm run test` to run tests: the primary pedagogical purpose for this repo is thinking through what would make good tests of all the interfaces (the lawful tests, demonstration operations, etc.)
 
-Just because this library does it doesn't mean it's right, or a good idea.
+Just because this library does it doesn't mean it's right, or a good idea.  This is my personal playground for FP types.  All corrections welcome!
 
 
-Exports Maybe, Nothing, & Just
+Main lib exports Maybe, Nothing, & Just
+Extended lib implements Cont, Const, Either, Identity, IO, Maybe, Reader, State (&T), Tuple, & Writer
 
 ```
 Just(5).getOrElse(4);//-> 5
