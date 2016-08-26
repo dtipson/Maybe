@@ -8,7 +8,7 @@ Just because this library does it doesn't mean it's right, or a good idea.  This
 
 The main lib exports `Maybe`, `Nothing`, & `Just`
 
-The extended lib (also available on the index page) implements `Cont, Const, Either, Identity, IO, Maybe, Reader, State (&T), Tuple, & Writer`.  It also enhances Array and Promise to make them conform to [fantasy-land](https://github.com/fantasyland/fantasy-land)
+The extended lib (also available on the index page) implements `Cont, Const, Either, Identity, IO, Maybe, Reader, State (&T), Tuple, & Writer`.  It also enhances Array and Promise to make them conform to [fantasy-land](https://github.com/fantasyland/fantasy-land) (in real-life, it's probably better to use a real List type and/or a real Future/Task type)
 
 ```
 Just(5).getOrElse(4);//-> 5
