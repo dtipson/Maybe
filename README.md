@@ -94,12 +94,10 @@ Array.of(Just([4])).sequence(Maybe.of).map(x=>x.flatten()).map(x=>x[0]).getOrEls
 [1,2].traverse(actualApi, Promise.of);//-> Promise[[result, result]] Array of promises becomes a promise of Arrays
 ```
 
-Hell...
+Heck, I mean...
 
 ```
 [IO.of(9),IO.of(7)].sequence(IO.of).runUnsafe();//-> [9,7]
-
-
 
 Continuation.of(1).run(x=>x+1) + Continuation(x=>x+1).run(1);//-> 4
 Promise.all([Promise.of(x=>x+1).ap(Promise.of(1)),Promise.of(1).map(x=>x+1)]).then(([x,y])=>x+y);//->Promise[4]
