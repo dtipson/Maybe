@@ -98,79 +98,13 @@ Validation.fromNullable = Validation.prototype.fromNullable;
 Validation.fromMaybe = Validation.prototype.fromMaybe;
 Validation.fromEither = Validation.prototype.fromEither;
 
-const aggregate2 = subject => test1 => test2 => 
-  Success(a => b => subject).ap(test1(subject)).ap(test2(subject));
-
-
-function curryN(n, f){
-  return function _curryN(as) { return function() {
-    var args = as.concat([].slice.call(arguments))
-    return args.length < n?  _curryN(args)
-    :      /* otherwise */   f.apply(null, args)
-  }}([])
-}
-
 //not quite working
-const aggregateish = (...testList) => 
-  testValue => 
-  testList.reduce((acc,x)=>acc.ap(x(testValue)), Success(curryN(testList.length, x=>testValue)) );
-
-//not quite working
-const aggregate = (...testList) => 
-  testValue => 
+const aggregateValidations = (...testList) => testValue => 
   testList.traverse(test=>test(testValue), Validation.of);
-
-/*
-Array of Success/Failure returning functions, then map(ap) the value to all of them
-
-[x=>x===3?Success(3):Failure(['not 3']),x=>x===3?Success(3):Failure(['not 3']),x=>x===3?Success(3):Failure(['not 3'])].map(x=>x(4)).sequence(Validation.of)
-
-[x=>x===3?Success(3):Failure(['not 3']),x=>x===3?Success(3):Failure(['not 3']),x=>x===3?Success(3):Failure(['not 3'])].traverse(x=>x(4),Validation.of)
-
-
-
-
-*/
-
-
-/*
-
-from monet.js
-
-
-var person = function (forename, surname, address) {
-    return forename + " " + surname + " lives at " + address
-}.curry();
-
-
-var validateAddress = Validation.success('Dulwich, London')
-var validateSurname = Validation.success('Baker')
-var validateForename = Validation.success('Tom')
-
-var personString = validateAddress.ap(validateSurname
-  .ap(validateForename.map(person))).success()
-
-// result: "Tom Baker lives at Dulwich, London"
-
-var result = Validation.fail(["no address"])
-  .ap(Validation.fail(["no surname"])
-  .ap(validateForename.map(person)))
-// result: Validation(["no address", "no surname"])
-
-*/
-/*
-const aggregate = testList => 
-  testValue => 
-  testList.reduce((acc,x)=>acc.ap(x(testValue)), Success());//create function curried with exact # of args, ultimately returning testValue
-*/
-
-
-
 
 module.exports = {
   Validation,
   Failure,
   Success,
-  aggregate2,
-  aggregate
+  aggregateValidations
 };
