@@ -108,14 +108,14 @@ Or, like:
 
 ```
 aggregate(
-  x=>x===3?Success(3):Failure(['not 3']),
-  x=>x===3?Success(3):Failure(['not 3']),
-  x=>x===3?Success(3):Failure(['not 3']))(8);
-//-> Failure[["not 3","not 3","not 3"]]
+  x => x===3 ? Success(3) : Failure(['not 3']),
+  x => x===3 ? Success(3) : Failure(['not 3']),
+  x => x===3 ? Success(3) : Failure(['not 3'])
+)(8);//-> Failure[["not 3","not 3","not 3"]]
 
 aggregate(
-  x=>x===3?Success(3):Failure(['not 3']),
-  x=>x===3?Success(3):Failure(['not 3']),
-  x=>x===3?Success(3):Failure(['not 3']))(3);
-//-> Success[3]
+  x => x===3 ? Success(3) : Failure(['not 3']),
+  x => x===3 ? Success(3) : Failure(['not 3']),
+  x => x===3 ? Success(3) : Failure(['not 3'])
+)(3);//-> Success[3]
 ```
