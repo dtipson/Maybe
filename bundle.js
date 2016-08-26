@@ -824,7 +824,7 @@ Validation.prototype.map = function(f) {
 
 Failure.prototype.ap = function(b) {
   return b.cata({
-    Failure: e => this.e.concat(e),
+    Failure: e => Failure(this.e.concat(e)),
     Success: s => this
   });
 }
@@ -843,6 +843,12 @@ Validation.prototype.getOrElse = function(a) {
   });
 }
 
+Validation.prototype.leftMap = function(f) {
+  return this.cata({
+    Failure: e => Failure(f(e)),
+    Success: _ => this
+  });
+}
 
 
 
