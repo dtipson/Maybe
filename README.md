@@ -107,6 +107,15 @@ Promise.all([Promise.of(x=>x+1).ap(Promise.of(1)),Promise.of(1).map(x=>x+1)]).th
 Or, like:
 
 ```
-aggregate(x=>x===3?Success(3):Failure(['not 3']),x=>x===3?Success(3):Failure(['not 3']),x=>x===3?Success(3):Failure(['not 3']))(8);//-> ["not 3","not 3","not 3"]
+aggregate(
+  x=>x===3?Success(3):Failure(['not 3']),
+  x=>x===3?Success(3):Failure(['not 3']),
+  x=>x===3?Success(3):Failure(['not 3']))(8);
+//-> ["not 3","not 3","not 3"]
 
-aggregate(x=>x===3?Success(3):Failure(['not 3']),x=>x===3?Success(3):Failure(['not 3']),x=>x===3?Success(3):Failure(['not 3']))(3);//-> Success[3]
+aggregate(
+  x=>x===3?Success(3):Failure(['not 3']),
+  x=>x===3?Success(3):Failure(['not 3']),
+  x=>x===3?Success(3):Failure(['not 3']))(3);
+//-> Success[3]
+```
