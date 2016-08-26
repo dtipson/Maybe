@@ -6,8 +6,9 @@ Quick, instructional implementation of the Maybe Type in FP javascript, with tes
 Just because this library does it doesn't mean it's right, or a good idea.  This is my personal playground for FP types.  All corrections welcome!
 
 
-Main lib exports Maybe, Nothing, & Just
-Extended lib implements Cont, Const, Either, Identity, IO, Maybe, Reader, State (&T), Tuple, & Writer
+The main lib exports `Maybe`, `Nothing`, & `Just`
+
+The extended lib (also available on the index page) implements `Cont, Const, Either, Identity, IO, Maybe, Reader, State (&T), Tuple, & Writer`
 
 ```
 Just(5).getOrElse(4);//-> 5
