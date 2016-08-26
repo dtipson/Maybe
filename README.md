@@ -111,7 +111,7 @@ aggregate(
   x=>x===3?Success(3):Failure(['not 3']),
   x=>x===3?Success(3):Failure(['not 3']),
   x=>x===3?Success(3):Failure(['not 3']))(8);
-//-> ["not 3","not 3","not 3"]
+//-> Failure[["not 3","not 3","not 3"]]
 
 aggregate(
   x=>x===3?Success(3):Failure(['not 3']),
