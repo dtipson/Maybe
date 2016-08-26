@@ -62,13 +62,20 @@ Validation.prototype.getOrElse = function(a) {
   });
 }
 
+Failure.prototype.sequence = function(of) {
+  return this.e.map(Failure);
+}
+
+Success.prototype.sequence = function(of) {
+  return this.s.map(Failure);
+}
+
 Validation.prototype.leftMap = function(f) {
   return this.cata({
     Failure: e => Failure(f(e)),
     Success: _ => this
   });
 }
-
 
 
 Object.assign(Validation.prototype,{
@@ -103,6 +110,28 @@ function curryN(n, f){
   }}([])
 }
 
+//not quite working
+const aggregateish = (...testList) => 
+  testValue => 
+  testList.reduce((acc,x)=>acc.ap(x(testValue)), Success(curryN(testList.length, x=>testValue)) );
+
+//not quite working
+const aggregate = (...testList) => 
+  testValue => 
+  testList.traverse(test=>test(testValue), Validation.of);
+
+/*
+Array of Success/Failure returning functions, then map(ap) the value to all of them
+
+[x=>x===3?Success(3):Failure(['not 3']),x=>x===3?Success(3):Failure(['not 3']),x=>x===3?Success(3):Failure(['not 3'])].map(x=>x(4)).sequence(Validation.of)
+
+[x=>x===3?Success(3):Failure(['not 3']),x=>x===3?Success(3):Failure(['not 3']),x=>x===3?Success(3):Failure(['not 3'])].traverse(x=>x(4),Validation.of)
+
+
+
+
+*/
+
 
 /*
 
@@ -135,10 +164,7 @@ const aggregate = testList =>
   testList.reduce((acc,x)=>acc.ap(x(testValue)), Success());//create function curried with exact # of args, ultimately returning testValue
 */
 
-//not quite working
-const aggregate = (...testList) => 
-  testValue => 
-  testList.reduce((acc,x)=>acc.ap(x(testValue)), Success(curryN(testList.length, x=>testValue)) );
+
 
 
 module.exports = {
