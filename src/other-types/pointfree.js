@@ -29,6 +29,26 @@ const fold = foldMap(I);
 const composeK = (...fns) => compose( ...([I].concat(map(chain, fns))) );
 
 
+  //specialized reducer, but why is it internalized?
+  const perform = point => (mr, mx) => mr.chain(xs => mx.chain( x => { 
+      xs.push(x); 
+      return point(xs);
+    })
+  );
+
+//array.sequence, alternate
+const sequence = curry((point, ms) => {
+
+
+  return typeof ms.sequence === 'function' ?
+    ms.sequence(point) :
+    ms.reduce(perform(point), point([]));
+
+});
+
+
+
+
 module.exports = {
   I,
   K,
@@ -40,5 +60,6 @@ module.exports = {
   map,
   chain,
   liftA2,
-  liftA3
+  liftA3,
+  sequence
 };
