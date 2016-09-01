@@ -16,11 +16,12 @@ Object.assign(
   require('./src/other-types/Either.js'),
   {Const, Continuation, Cont:Continuation, Identity, IO, Reader, Tuple, State, Writer},
   require('./src/other-types/pointfree.js'),
+  require('./src/other-types/monoids.js'),
   require('./src/other-types/Validation.js'),
   require('./src/other-types/utility.js')
 );
-},{"./src/Maybe.js":2,"./src/other-types/Array-helpers.js":3,"./src/other-types/Const.js":4,"./src/other-types/Continuation.js":5,"./src/other-types/Either.js":6,"./src/other-types/IO.js":7,"./src/other-types/Identity.js":8,"./src/other-types/Promise-helpers.js":9,"./src/other-types/Reader.js":10,"./src/other-types/State.js":11,"./src/other-types/Tuple.js":12,"./src/other-types/Validation.js":13,"./src/other-types/Writer.js":14,"./src/other-types/pointfree.js":15,"./src/other-types/utility.js":16}],2:[function(require,module,exports){
-const {curry}  = require('../src/other-types/pointfree.js');
+},{"./src/Maybe.js":2,"./src/other-types/Array-helpers.js":3,"./src/other-types/Const.js":4,"./src/other-types/Continuation.js":5,"./src/other-types/Either.js":6,"./src/other-types/IO.js":7,"./src/other-types/Identity.js":8,"./src/other-types/Promise-helpers.js":9,"./src/other-types/Reader.js":10,"./src/other-types/State.js":11,"./src/other-types/Tuple.js":12,"./src/other-types/Validation.js":13,"./src/other-types/Writer.js":14,"./src/other-types/monoids.js":15,"./src/other-types/pointfree.js":16,"./src/other-types/utility.js":17}],2:[function(require,module,exports){
+const {curry, compose, head, init, last, tail, prop}  = require('../src/other-types/pointfree.js');
 
 function Maybe(){//create a prototype for Nothing/Just to inherit from
     throw new TypeError('Maybe is not called directly');
@@ -31,10 +32,10 @@ function Maybe(){//create a prototype for Nothing/Just to inherit from
 const Nothing = (function(){
   const Nothing = function(){};
   Nothing.prototype = Object.create(Maybe.prototype);
-  Nothing.prototype.ap = Nothing.prototype.chain = Nothing.prototype.join = Nothing.prototype.flatten = Nothing.prototype.map = Nothing.prototype.filter = function(){ return this; };
+  Nothing.prototype.ap = Nothing.prototype.chain = Nothing.prototype.join = Nothing.prototype.flatten = Nothing.prototype.map = Nothing.prototype.filter = Nothing.prototype.empty = function(){ return this; };
   Nothing.prototype.sequence = function(of){ return of(this); };//flips Nothing insde a type, i.e.: Type[Nothing]
   Nothing.prototype.traverse = function(fn, of){ return of(this); };//same as above, just ignores the map fn
-  Nothing.prototype.reduce = Nothing.prototype.fold = (a, b) => a,//binary function is ignored, the accumulator returned
+  Nothing.prototype.reduce = Nothing.prototype.fold = (f, x) => x,//binary function is ignored, the accumulator returned
   Nothing.prototype.getOrElse = Nothing.prototype.orElse = Nothing.prototype.concat = x => x;//just returns the provided value
   Nothing.prototype.cata = ({Nothing}) => Nothing();  //not the Nothing type constructor here, btw, a prop named "Nothing" defining a nullary function!
   Nothing.prototype.equals = function(y){return y==this;};//setoid
@@ -63,7 +64,8 @@ Just.prototype.chain = function(f){ return f(this.value); };//transform the inne
 Just.prototype.sequence = function(of){ return this.value.map(Just); };//flip an inner type with the outer Just
 Just.prototype.traverse = function(fn, of){ return this.map(fn).sequence(of); };//transform the inner value (resulting in an inner type) then flip that type outside
 Just.prototype.toString = function(){ return `Just[${this.value}]`; };
-Just.prototype.reduce = Just.prototype.fold = function(a, b) { return b(this.value); };//binary function is run, accumulator ignored
+Just.prototype.reduce = function(f, x) { return f(x, this.value); };//standard binary function, value in Just is the only item
+Just.prototype.empty = _ => Nothing;
 Just.prototype.filter = function(fn){ return this.chain(x=> fn(x)? this : Nothing ); };//test the inner value with a function
 
 //assuming that the inner value has a concat method, concat it with another Just. Falls back to + for strings and numbers
@@ -77,17 +79,26 @@ Just.prototype.cata = function({Just}){ return Just(this.value) };//calls the fu
 Just.prototype.toBoolean = _ => true;//reduce a Just to true. Useful in filters
 Just.prototype.toJSON = function(){ return `{"type":"Maybe.Just","value":${JSON.stringify(this.value)}}`; };
 
+const isNull = x => x===null || x===undefined;
+const fromNullable =  x => isNull(x) ? Nothing : Just(x);
+
 //we're not strictly defining Just and Nothing as subtypes of Maybe here, but we DO want to have a Maybe interface for more abstract usages
-Object.assign(Maybe,{
+Object.assign(Maybe, {
   of: x => new Just(x),//pointed interface to create the type (Just(9)/Maybe.of are synonymous )
-  empty: _ => Nothing,//calling empty returns a Nothing
-  isNull: x=> x===null || x===undefined,
+  empty: Nothing.empty,//calling empty returns a Nothing
   toBoolean: m => m!==Nothing,//reduce a passed in Just[any value]/Nothing value to true or false, useful for filters
-  fromNullable: x=> Maybe.isNull(x) ? Nothing : Just(x),
-  maybe: (nothingVal, justFn, M) => M.reduce(nothingVal, justFn)
+  isNull,
+  fromNullable,
+  fromFilter: fn => x => fn(x) ? Just(x) : Nothing,
+  maybe: curry((nothingVal, justFn, M) => M.reduce( (_,x) => justFn(x), nothingVal )),//no accumulator usage
+  head: compose(fromNullable, head),
+  tail: compose(fromNullable, tail),
+  init: compose(fromNullable, init),
+  last: compose(fromNullable, last),
+  prop: namespace => compose(fromNullable, prop(namespace))
 });
 
-const maybe = curry(Maybe.maybe);//pretty important pattern, yo
+const maybe = Maybe.maybe;//pretty important pattern, yo
 
 module.exports = {
   Maybe,
@@ -221,7 +232,7 @@ const process = maybe(create, update, maybeRecord);
 
 process(4);
 */
-},{"../src/other-types/pointfree.js":15}],3:[function(require,module,exports){
+},{"../src/other-types/pointfree.js":16}],3:[function(require,module,exports){
 Array.empty = _ => [];
 Array.prototype.flatten = function(){return [].concat(...this); };
 //we need to guard the f against the extra args that native Array.map passes to avoid silly results
@@ -234,7 +245,9 @@ Array.prototype.ap = function(a) {
 Array.prototype.sequence = function(point){
     return this.reduceRight(
       function(acc, x) {
-        return acc.map(arr => p => [p].concat(arr) ).ap(x);
+        return acc
+          .map(innerarray => promise => [promise].concat(innerarray) )//puts this function in the type
+          .ap(x);//then applies the inner promise value to it
       },
       point([])
     );
@@ -399,8 +412,17 @@ doCont(
 },{}],6:[function(require,module,exports){
 const {curry, K, I}  = require('../../src/other-types/pointfree.js');
 
-function Either(left, right){
-  return right === null ? new Right(right) : new Left(left);
+function Either(...args){
+  switch (args.length) {
+    case 0:
+      throw new TypeError('no left value: consider using Maybe');
+    case 1:
+      return function(right) {
+        return right == null ? Left(args[0]) : Right(right);
+      };
+    default:
+      return args[1] == null ? Left(args[0]) : Right(args[1]);
+  }
 }
 
 const Left = function(x){
@@ -425,6 +447,7 @@ Right.prototype = Object.create(Either.prototype);
 Left.prototype.cata = function({Left}){ return Left(this.l) };
 Right.prototype.cata = function({Right}){ return Right(this.r) };
 
+///???
 Either.prototype.fold = Either.prototype.reduce = function(f, g) {
   return this.cata({
     Left: f,
@@ -444,6 +467,8 @@ Either.prototype.ap = function(A) {
     return this.chain(f => A.map(f));
 };
 
+
+///???
 Either.prototype.sequence = function(p) {
     return this.traverse(I, p);
 };
@@ -461,17 +486,20 @@ Either.prototype.bimap = function(f, g) {
   );
 };
 
+
+Either.fromFilter = fn => x => fn(x) ? Right(x) : Left(x);
 Either.of = x => new Right(x);
-Either.either = (leftFn, rightFn, e) => {
-  if(e instanceof Left){
-    return leftFn(e.value);
+Either.either = curry((leftFn, rightFn, E) => {
+  console.log()
+  if(E instanceof Left){
+    return leftFn(E.l);
   }
-  else if(e instanceof Right){
-    return rightFn(e.value);
+  else if(E instanceof Right){
+    return rightFn(E.r);
   }else{
     throw new TypeError('invalid type given to Either.either');
   }
-} 
+});
 
 
 module.exports = {
@@ -479,7 +507,7 @@ module.exports = {
   Left,
   Right
 };
-},{"../../src/other-types/pointfree.js":15}],7:[function(require,module,exports){
+},{"../../src/other-types/pointfree.js":16}],7:[function(require,module,exports){
 function IO(fn) {
   if (!(this instanceof IO)) {
     return new IO(fn);
@@ -488,7 +516,7 @@ function IO(fn) {
 }
 
 
-IO.prototype.of = x => IO(_=>x);//it can also take a value IO(K(x))
+IO.prototype.of = x => IO(_=>x);//basically the same as IO(K(x))
 IO.of = IO.prototype.of;
 
 IO.prototype.chain = function(f) {
@@ -511,6 +539,9 @@ IO.prototype.map = function(f) {
 IO.prototype.sequence = function(of) {
   return of(this.map());
 };
+
+//String->IO[Array]
+IO.$ = selectorString => new IO(_ => Array.from(document.querySelectorAll(selectorString)));
 
 
 module.exports = IO;
@@ -560,6 +591,14 @@ Promise.prototype.ap = function(p2){
   return Promise.all([this, p2]).then(([fn, x]) => fn(x));
 }
 
+Promise.prototype.bimap = function(e,s){
+  return this.then(s).catch(e);
+};
+
+// Promise.prototype.ap = function(p2){
+//   return [this,p2].sequence(Promise.of).then(([fn, x]) => fn(x));
+// }
+
 //create a Promise that will never resolve
 Promise.empty = function _empty() {
   return new Promise(function() {});
@@ -606,6 +645,9 @@ Promise.prototype.orElse = function _orElse(f) {
 
 
 },{}],10:[function(require,module,exports){
+const {invoke}  = require('../../src/other-types/pointfree.js');
+
+
 function Reader(run) {
   if (!(this instanceof Reader)) {
     return new Reader(run);
@@ -641,9 +683,16 @@ Reader.ask = Reader(x=>x);//ask allows you to inject the/a runtime depedency int
 //silly helper
 Reader.binary = fn => x => Reader.ask.map(y => fn(y, x));
 Reader.exec = x => Reader.ask.map(fn => fn(x));
+Reader.invoke = methodname => x => Reader.ask.map(invoke(methodname)).ap(Reader.of(x));
 
 module.exports = Reader;
-},{}],11:[function(require,module,exports){
+
+//really useful case: pass an interface in later on
+//Reader.of(6).chain(x=>Reader.ask.map(lib=>lib.increment(x))).run({increment:x=>x+1});
+
+//invoke a method on an interface to be passed in later!
+//Reader.of(6).chain(Reader.invoke('increment')).run({increment:x=>x+1})
+},{"../../src/other-types/pointfree.js":16}],11:[function(require,module,exports){
 const {curry}  = require('../../src/other-types/pointfree.js');
 
 var Identity = require('./Identity');
@@ -730,7 +779,7 @@ State.prototype.run = function(s) {
 };
 
 module.exports = State;
-},{"../../src/other-types/pointfree.js":15,"./Identity":8,"./Tuple":12,"./utility":16}],12:[function(require,module,exports){
+},{"../../src/other-types/pointfree.js":16,"./Identity":8,"./Tuple":12,"./utility":17}],12:[function(require,module,exports){
 function Tuple(x, y) {
   if (!(this instanceof Tuple)) {
     return new Tuple(x,y);
@@ -843,6 +892,7 @@ Validation.prototype.getOrElse = function(a) {
   });
 }
 
+//probably not right
 Failure.prototype.sequence = function(of) {
   return this.e.map(Failure);
 }
@@ -879,83 +929,16 @@ Validation.fromNullable = Validation.prototype.fromNullable;
 Validation.fromMaybe = Validation.prototype.fromMaybe;
 Validation.fromEither = Validation.prototype.fromEither;
 
-const aggregate2 = subject => test1 => test2 => 
-  Success(a => b => subject).ap(test1(subject)).ap(test2(subject));
-
-
-function curryN(n, f){
-  return function _curryN(as) { return function() {
-    var args = as.concat([].slice.call(arguments))
-    return args.length < n?  _curryN(args)
-    :      /* otherwise */   f.apply(null, args)
-  }}([])
-}
-
 //not quite working
-const aggregateish = (...testList) => 
-  testValue => 
-  testList.reduce((acc,x)=>acc.ap(x(testValue)), Success(curryN(testList.length, x=>testValue)) );
-
-//not quite working
-const aggregate = (...testList) => 
-  testValue => 
-  testList.traverse(test=>test(testValue), Validation.of);
-
-/*
-Array of Success/Failure returning functions, then map(ap) the value to all of them
-
-[x=>x===3?Success(3):Failure(['not 3']),x=>x===3?Success(3):Failure(['not 3']),x=>x===3?Success(3):Failure(['not 3'])].map(x=>x(4)).sequence(Validation.of)
-
-[x=>x===3?Success(3):Failure(['not 3']),x=>x===3?Success(3):Failure(['not 3']),x=>x===3?Success(3):Failure(['not 3'])].traverse(x=>x(4),Validation.of)
-
-
-
-
-*/
-
-
-/*
-
-from monet.js
-
-
-var person = function (forename, surname, address) {
-    return forename + " " + surname + " lives at " + address
-}.curry();
-
-
-var validateAddress = Validation.success('Dulwich, London')
-var validateSurname = Validation.success('Baker')
-var validateForename = Validation.success('Tom')
-
-var personString = validateAddress.ap(validateSurname
-  .ap(validateForename.map(person))).success()
-
-// result: "Tom Baker lives at Dulwich, London"
-
-var result = Validation.fail(["no address"])
-  .ap(Validation.fail(["no surname"])
-  .ap(validateForename.map(person)))
-// result: Validation(["no address", "no surname"])
-
-*/
-/*
-const aggregate = testList => 
-  testValue => 
-  testList.reduce((acc,x)=>acc.ap(x(testValue)), Success());//create function curried with exact # of args, ultimately returning testValue
-*/
-
-
-
+const aggregateValidations = (...testList) => testValue => testList.traverse(test=>test(testValue), Validation.of);
 
 module.exports = {
   Validation,
   Failure,
   Success,
-  aggregate2,
-  aggregate
+  aggregateValidations
 };
-},{"../../src/other-types/pointfree.js":15}],14:[function(require,module,exports){
+},{"../../src/other-types/pointfree.js":16}],14:[function(require,module,exports){
 function Writer(l, v) {
   if (!(this instanceof Writer)) {
     return new Writer(l,v);
@@ -964,7 +947,7 @@ function Writer(l, v) {
   this[1] = v;//value
 }
 
-Writer.of = (x) => new Writer('', x);
+Writer.of = (x) => new Writer('', x);//'' is the "empty" type of string
 Writer.prototype.of = Writer.of;
 
 Writer.prototype.chain = function(f){
@@ -1004,15 +987,134 @@ Writer.prototype.sequence = function(of){
 
 module.exports = Writer;
 },{}],15:[function(require,module,exports){
+String.prototype.empty = x => '';//makes string a well behaved monoid for left to right cases
+String.empty = String.prototype.empty;
+
+const Endo = function(f){
+  if (!(this instanceof Endo)) {
+    return new Endo(f);
+  }
+  this.appEndo = runEndo;
+}
+
+Endo.of = x => Endo(x);
+Endo.empty = _ => Endo(x=>x);
+
+//concat is just composition
+Endo.prototype.concat = function(y) {
+  return Endo(compose(this.appEndo,y.appEndo));
+};
+
+//concat is just composition
+Endo.prototype.concat = function(y) {
+  return Endo(compose(this.appEndo,y.appEndo));
+};
+
+
+/*
+thinking through it...
+
+addOne = x=> x+1
+addTwo = x=> x+2
+addThree = x => x+3
+
+compose(addOne, addTwo) -> 
+  (...args) => addOne(compose(addTwo)(...args)) -> 
+  (...args) => addOne(addTwo(...args))
+
+compose(addOne, addTwo, addThree) -> 
+  (...args) => addOne(compose(addTwo, addThree)(...args)) -> 
+  (...args) => addOne( ((...args2) => addTwo(compose(addThree)(...args2)))  (...args)) -> 
+  (...args) => addOne( ((...args2) => addTwo(addThree(...args2)))  (...args))
+*/
+
+
+//Disjunction, the sticky-true Monoid (i.e. "any true" = true)
+const Disjunction = function(x){
+  if (!(this instanceof Disjunction)) {
+    return new Disjunction(x);
+  }
+  this.x = x;
+}
+
+Disjunction.of = x => Disjunction(x);
+Disjunction.empty = () => Disjunction(false);
+
+Disjunction.prototype.equals = function(y) {
+    return this.x === y.x;
+};
+Disjunction.prototype.concat = function(y) {
+    return Disjunction(this.x || y.x);
+};
+
+//a Disjunction of true, once concatted to any other Disjunction, can never be turned false
+//Disjunction.of(false).concat(Disjunction.of(true)).concat(Disjunction.of(false));
+
+const Any = Disjunction;
+
+
+//Conjunction, the sticky-false Monoid (i.e. all must be true or "any false")
+const Conjunction = function(x){
+  if (!(this instanceof Conjunction)) {
+    return new Conjunction(x);
+  }
+  this.x = x;
+}
+
+Conjunction.of = x => Conjunction(x);
+Conjunction.empty = () => Conjunction(true);
+
+Conjunction.prototype.equals = function(y) {
+    return this.x === y.x;
+};
+Conjunction.prototype.concat = function(y) {
+    return Conjunction(this.x && y.x);
+};
+
+//a Conjunction of false, once concatted to any other Conjunction, can never be turned true
+//Conjunction.of(false).concat(Conjunction.of(true)).concat(Conjunction.of(false));
+
+const All = Conjunction;
+
+
+//Sum, 
+const Sum = function(x){
+  if (!(this instanceof Sum)) {
+    return new Sum(x);
+  }
+  this.x = x;
+}
+
+Sum.of = x => Sum(x);
+Sum.prototype.empty = () => Sum(0);
+
+Sum.prototype.concat = function(y) {
+    return Sum(this.x + y.x);
+};
+
+//Max 
+//Min, etc. all require some further constraints, like Ord
+
+
+module.exports = {
+  Sum,
+  Any,
+  All,
+  Endo
+}
+},{}],16:[function(require,module,exports){
 const compose  = (fn, ...rest) =>
   rest.length === 0 ?
     (fn||(x=>x)) :
     (...args) => fn(compose(...rest)(...args));
 const curry = (f, ...args) => (f.length <= args.length) ? f(...args) : (...more) => curry(f, ...args, ...more);
 
-const I = x=>x;
-const K = x=>y=>x;
+const I = x => x;
+const K = x => y => x;
+const S = b => f => x => b(x,f(x));
 
+//String -> Object -> Arguments -> ?
+const invoke = methodname => obj => (...args) => obj[methodname](...args);
 
 const ap = curry((A,A2) => A.ap(A2));
 const map = curry((f,F) => F.map(x=>f(x)));//guard against Array.map
@@ -1020,6 +1122,18 @@ const reduce = curry((f,acc,F) => F.reduce(f,acc));
 const chain = curry((f, M) => M.chain(f));
 const liftA2 = curry((f, A1, A2) => A1.map(f).ap(A2));
 const liftA3 = curry((f, A1, A2, A3) => A1.map(f).ap(A2).ap(A3));
+
+const concat = curry( (x, y) => x.concat(y));
+
+
+const head = xs => xs[0];
+const tail = xs => xs.slice(1, Infinity);
+const init = xs => xs.slice(0,-1);
+const last = xs => xs.slice(-1);
+const prop = namespace => obj => obj[namespace];
+
+const mconcat = (xs, empty) => xs.length ? xs.reduce(concat) : empty();
+const bimap = curry((f,g,B)=> B.bimap(f,g)); 
 
 const foldMap = curry(function(f, fldable) {
   return fldable.reduce(function(acc, x) {
@@ -1031,24 +1145,58 @@ const foldMap = curry(function(f, fldable) {
 
 const fold = foldMap(I);
 
+//from http://robotlolita.me/2013/12/08/a-monad-in-practicality-first-class-failures.html
+function curryN(n, f){
+  return function _curryN(as) { return function() {
+    var args = as.concat([].slice.call(arguments))
+    return args.length < n?  _curryN(args)
+    :      /* otherwise */   f.apply(null, args)
+  }}([])
+}
+
 //Kleisli composition
 const composeK = (...fns) => compose( ...([I].concat(map(chain, fns))) );
 
+  //specialized reducer, but why is it internalized?
+  const perform = point => (mr, mx) => mr.chain(xs => mx.chain( x => { 
+      xs.push(x); 
+      return point(xs);
+    })
+  );
+
+//array.sequence, alternate
+const sequence = curry((point, ms) => {
+  return typeof ms.sequence === 'function' ?
+    ms.sequence(point) :
+    ms.reduce(perform(point), point([]));
+});
 
 module.exports = {
   I,
   K,
+  S,
   compose,
   composeK,
   curry,
+  curryN,
   reduce,
   ap,
   map,
   chain,
+  mconcat,
+  concat,
   liftA2,
-  liftA3
+  liftA3,
+  sequence,
+  invoke,
+  head,
+  tail,
+  init,
+  last,
+  prop,
+  bimap
 };
-},{}],16:[function(require,module,exports){
+},{}],17:[function(require,module,exports){
 (function (global){
 const {curry}  = require('../../src/other-types/pointfree.js');
 
@@ -1070,7 +1218,7 @@ const deriveAp = Applicative => function(app2) {
   return this.chain(fn => app2.chain(app2value => Applicative.of(fn(app2value)) ) );
 };
 
-//write monadic operations in do notation using generators
+//write in-type monadic operations in do notation using generators
 const doM = gen => {
     function step(value) {
         var result = gen.next(value);
@@ -1090,6 +1238,20 @@ var result = doM(function*() {
 */
 
 
+//https://drboolean.gitbooks.io/mostly-adequate-guide/content/ch8.html#a-spot-of-theory
+const Compose = function(f_g_x) {
+  if (!(this instanceof Compose)) {
+    return new Compose(f_g_x);
+  }
+  this.getCompose = f_g_x;
+};
+
+Compose.prototype.map = function(f) {
+  return new Compose(map(map(f), this.getCompose));
+};
+
+
+
 module.exports = {
   delay,
   delayR,
@@ -1099,7 +1261,8 @@ module.exports = {
   andLog,
   deriveMap,
   deriveAp,
-  doM
+  doM,
+  Compose
 };
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{"../../src/other-types/pointfree.js":15}]},{},[1]);
+},{"../../src/other-types/pointfree.js":16}]},{},[1]);

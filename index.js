@@ -15,6 +15,7 @@ Object.assign(
   require('./src/other-types/Either.js'),
   {Const, Continuation, Cont:Continuation, Identity, IO, Reader, Tuple, State, Writer},
   require('./src/other-types/pointfree.js'),
+  require('./src/other-types/monoids.js'),
   require('./src/other-types/Validation.js'),
   require('./src/other-types/utility.js')
 );

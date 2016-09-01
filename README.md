@@ -47,6 +47,10 @@ Nothing.orElse(Just(9));//-> Just[9]
 maybe(8, x=>x+1, Just(7));//-> 8
 maybe(8, x=>x+1, Nothing);//-> 8
 
+//or fold types into functions to normalize arity
+maybe(x=>x+1, x=>y=>x+y, Just(7));//-> y=>x+y
+maybe(x=>x+1, x=>y=>x+y, Nothing);//-> x=x+1
+
 
 //the utility of the Type is the ability to emit the lack of a value without breaking composition...
 const mockApi = id => id===1 ? Just({record:1}) : Nothing;

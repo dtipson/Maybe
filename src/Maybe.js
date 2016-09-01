@@ -1,4 +1,4 @@
-const {curry}  = require('../src/other-types/pointfree.js');
+const {curry, compose, head, init, last, tail, prop}  = require('../src/other-types/pointfree.js');
 
 function Maybe(){//create a prototype for Nothing/Just to inherit from
     throw new TypeError('Maybe is not called directly');
@@ -9,10 +9,10 @@ function Maybe(){//create a prototype for Nothing/Just to inherit from
 const Nothing = (function(){
   const Nothing = function(){};
   Nothing.prototype = Object.create(Maybe.prototype);
-  Nothing.prototype.ap = Nothing.prototype.chain = Nothing.prototype.join = Nothing.prototype.flatten = Nothing.prototype.map = Nothing.prototype.filter = function(){ return this; };
+  Nothing.prototype.ap = Nothing.prototype.chain = Nothing.prototype.join = Nothing.prototype.flatten = Nothing.prototype.map = Nothing.prototype.filter = Nothing.prototype.empty = function(){ return this; };
   Nothing.prototype.sequence = function(of){ return of(this); };//flips Nothing insde a type, i.e.: Type[Nothing]
   Nothing.prototype.traverse = function(fn, of){ return of(this); };//same as above, just ignores the map fn
-  Nothing.prototype.reduce = Nothing.prototype.fold = (a, b) => a,//binary function is ignored, the accumulator returned
+  Nothing.prototype.reduce = Nothing.prototype.fold = (f, x) => x,//binary function is ignored, the accumulator returned
   Nothing.prototype.getOrElse = Nothing.prototype.orElse = Nothing.prototype.concat = x => x;//just returns the provided value
   Nothing.prototype.cata = ({Nothing}) => Nothing();  //not the Nothing type constructor here, btw, a prop named "Nothing" defining a nullary function!
   Nothing.prototype.equals = function(y){return y==this;};//setoid
@@ -41,7 +41,8 @@ Just.prototype.chain = function(f){ return f(this.value); };//transform the inne
 Just.prototype.sequence = function(of){ return this.value.map(Just); };//flip an inner type with the outer Just
 Just.prototype.traverse = function(fn, of){ return this.map(fn).sequence(of); };//transform the inner value (resulting in an inner type) then flip that type outside
 Just.prototype.toString = function(){ return `Just[${this.value}]`; };
-Just.prototype.reduce = Just.prototype.fold = function(a, b) { return b(this.value); };//binary function is run, accumulator ignored
+Just.prototype.reduce = function(f, x) { return f(x, this.value); };//standard binary function, value in Just is the only item
+Just.prototype.empty = _ => Nothing;
 Just.prototype.filter = function(fn){ return this.chain(x=> fn(x)? this : Nothing ); };//test the inner value with a function
 
 //assuming that the inner value has a concat method, concat it with another Just. Falls back to + for strings and numbers
@@ -55,17 +56,26 @@ Just.prototype.cata = function({Just}){ return Just(this.value) };//calls the fu
 Just.prototype.toBoolean = _ => true;//reduce a Just to true. Useful in filters
 Just.prototype.toJSON = function(){ return `{"type":"Maybe.Just","value":${JSON.stringify(this.value)}}`; };
 
+const isNull = x => x===null || x===undefined;
+const fromNullable =  x => isNull(x) ? Nothing : Just(x);
+
 //we're not strictly defining Just and Nothing as subtypes of Maybe here, but we DO want to have a Maybe interface for more abstract usages
-Object.assign(Maybe,{
+Object.assign(Maybe, {
   of: x => new Just(x),//pointed interface to create the type (Just(9)/Maybe.of are synonymous )
-  empty: _ => Nothing,//calling empty returns a Nothing
-  isNull: x=> x===null || x===undefined,
+  empty: Nothing.empty,//calling empty returns a Nothing
   toBoolean: m => m!==Nothing,//reduce a passed in Just[any value]/Nothing value to true or false, useful for filters
-  fromNullable: x=> Maybe.isNull(x) ? Nothing : Just(x),
-  maybe: (nothingVal, justFn, M) => M.reduce(nothingVal, justFn)
+  isNull,
+  fromNullable,
+  fromFilter: fn => x => fn(x) ? Just(x) : Nothing,
+  maybe: curry((nothingVal, justFn, M) => M.reduce( (_,x) => justFn(x), nothingVal )),//no accumulator usage
+  head: compose(fromNullable, head),
+  tail: compose(fromNullable, tail),
+  init: compose(fromNullable, init),
+  last: compose(fromNullable, last),
+  prop: namespace => compose(fromNullable, prop(namespace))
 });
 
-const maybe = curry(Maybe.maybe);//pretty important pattern, yo
+const maybe = Maybe.maybe;//pretty important pattern, yo
 
 module.exports = {
   Maybe,

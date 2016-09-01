@@ -11,6 +11,14 @@ Promise.prototype.ap = function(p2){
   return Promise.all([this, p2]).then(([fn, x]) => fn(x));
 }
 
+Promise.prototype.bimap = function(e,s){
+  return this.then(s).catch(e);
+};
+
+// Promise.prototype.ap = function(p2){
+//   return [this,p2].sequence(Promise.of).then(([fn, x]) => fn(x));
+// }
+
 //create a Promise that will never resolve
 Promise.empty = function _empty() {
   return new Promise(function() {});

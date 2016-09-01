@@ -6,7 +6,7 @@ function IO(fn) {
 }
 
 
-IO.prototype.of = x => IO(_=>x);//it can also take a value IO(K(x))
+IO.prototype.of = x => IO(_=>x);//basically the same as IO(K(x))
 IO.of = IO.prototype.of;
 
 IO.prototype.chain = function(f) {
@@ -29,6 +29,9 @@ IO.prototype.map = function(f) {
 IO.prototype.sequence = function(of) {
   return of(this.map());
 };
+
+//String->IO[Array]
+IO.$ = selectorString => new IO(_ => Array.from(document.querySelectorAll(selectorString)));
 
 
 module.exports = IO;

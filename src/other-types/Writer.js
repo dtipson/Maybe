@@ -6,7 +6,7 @@ function Writer(l, v) {
   this[1] = v;//value
 }
 
-Writer.of = (x) => new Writer('', x);
+Writer.of = (x) => new Writer('', x);//'' is the "empty" type of string
 Writer.prototype.of = Writer.of;
 
 Writer.prototype.chain = function(f){

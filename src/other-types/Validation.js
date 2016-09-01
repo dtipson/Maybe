@@ -62,6 +62,7 @@ Validation.prototype.getOrElse = function(a) {
   });
 }
 
+//probably not right
 Failure.prototype.sequence = function(of) {
   return this.e.map(Failure);
 }
@@ -99,8 +100,7 @@ Validation.fromMaybe = Validation.prototype.fromMaybe;
 Validation.fromEither = Validation.prototype.fromEither;
 
 //not quite working
-const aggregateValidations = (...testList) => testValue => 
-  testList.traverse(test=>test(testValue), Validation.of);
+const aggregateValidations = (...testList) => testValue => testList.traverse(test=>test(testValue), Validation.of);
 
 module.exports = {
   Validation,

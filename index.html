@@ -1,1 +1,28 @@
 <script src="bundle.js"></script>
+
+<div><input id="email" name="email" type="email"></div>
+<div><input id="password" name="password" type="password"></div>
+
+<script>
+
+  const mockFileSystem = {
+    hello: "hello Text",
+    help: "There is no help"
+  };
+
+  //simulate it taking time to access the file, with a possible failure
+  const mockFileAccess = filename => Promise.of(mockFileSystem[filename]).then(x=> x?x:Promise.reject(`${filename} not found`));
+
+  const hp = path => contents => Promise.of(`'${contents}' was uploaded to ${path}`)
+  const hpf = path => contents => Promise.reject(`upload of '${contents}' failed`);
+
+  //String -> Either(String | Promise)
+  const readFile = compose(map(mockFileAccess), Maybe.fromNullable);
+
+  const readAndPrintFile = compose(map(map(log)), readFile);
+  const rapFile = compose(x=>x.getCompose, map(log), Compose, readFile);
+  const rauFile = compose(x=>x.getCompose, map(log), map(hp('/uploads')), Compose, readFile);
+  const rauFileFailUpload = compose(x=>x.getCompose, map(log), map(hpf('/uploads')), Compose, readFile);
+
+  //run those commands with .map(p=>p.catch(x=>console.log(x))) to catch inner promise rejections
+</script>

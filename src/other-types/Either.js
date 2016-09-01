@@ -1,7 +1,16 @@
 const {curry, K, I}  = require('../../src/other-types/pointfree.js');
 
-function Either(left, right){
-  return right === null ? new Right(right) : new Left(left);
+function Either(...args){
+  switch (args.length) {
+    case 0:
+      throw new TypeError('no left value: consider using Maybe');
+    case 1:
+      return function(right) {
+        return right == null ? Left(args[0]) : Right(right);
+      };
+    default:
+      return args[1] == null ? Left(args[0]) : Right(args[1]);
+  }
 }
 
 const Left = function(x){
@@ -26,6 +35,7 @@ Right.prototype = Object.create(Either.prototype);
 Left.prototype.cata = function({Left}){ return Left(this.l) };
 Right.prototype.cata = function({Right}){ return Right(this.r) };
 
+///???
 Either.prototype.fold = Either.prototype.reduce = function(f, g) {
   return this.cata({
     Left: f,
@@ -45,6 +55,8 @@ Either.prototype.ap = function(A) {
     return this.chain(f => A.map(f));
 };
 
+
+///???
 Either.prototype.sequence = function(p) {
     return this.traverse(I, p);
 };
@@ -62,17 +74,20 @@ Either.prototype.bimap = function(f, g) {
   );
 };
 
+
+Either.fromFilter = fn => x => fn(x) ? Right(x) : Left(x);
 Either.of = x => new Right(x);
-Either.either = (leftFn, rightFn, e) => {
-  if(e instanceof Left){
-    return leftFn(e.value);
+Either.either = curry((leftFn, rightFn, E) => {
+  console.log()
+  if(E instanceof Left){
+    return leftFn(E.l);
   }
-  else if(e instanceof Right){
-    return rightFn(e.value);
+  else if(E instanceof Right){
+    return rightFn(E.r);
   }else{
     throw new TypeError('invalid type given to Either.either');
   }
-} 
+});
 
 
 module.exports = {

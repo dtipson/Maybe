@@ -18,7 +18,7 @@ const deriveAp = Applicative => function(app2) {
   return this.chain(fn => app2.chain(app2value => Applicative.of(fn(app2value)) ) );
 };
 
-//write monadic operations in do notation using generators
+//write in-type monadic operations in do notation using generators
 const doM = gen => {
     function step(value) {
         var result = gen.next(value);
@@ -38,6 +38,20 @@ var result = doM(function*() {
 */
 
 
+//https://drboolean.gitbooks.io/mostly-adequate-guide/content/ch8.html#a-spot-of-theory
+const Compose = function(f_g_x) {
+  if (!(this instanceof Compose)) {
+    return new Compose(f_g_x);
+  }
+  this.getCompose = f_g_x;
+};
+
+Compose.prototype.map = function(f) {
+  return new Compose(map(map(f), this.getCompose));
+};
+
+
+
 module.exports = {
   delay,
   delayR,
@@ -47,5 +61,6 @@ module.exports = {
   andLog,
   deriveMap,
   deriveAp,
-  doM
+  doM,
+  Compose
 };

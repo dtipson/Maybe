@@ -10,7 +10,9 @@ Array.prototype.ap = function(a) {
 Array.prototype.sequence = function(point){
     return this.reduceRight(
       function(acc, x) {
-        return acc.map(arr => p => [p].concat(arr) ).ap(x);
+        return acc
+          .map(innerarray => promise => [promise].concat(innerarray) )//puts this function in the type
+          .ap(x);//then applies the inner promise value to it
       },
       point([])
     );
