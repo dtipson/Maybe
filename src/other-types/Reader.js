@@ -30,13 +30,16 @@ Reader.prototype.of = function(a) {
 };
 Reader.of = Reader.prototype.of;
 
+//ask allows you to inject the/a runtime depedency into a computation without needing to specify ahead of time what it is
+Reader.ask = Reader(x=>x);
+//it's super tricky when you think about how it works, because you're mapping over the value in IT, but because it's used inside a chain, you're basically exiting out of the inner value and substituting in the run() value. The inner value only survives if it's passed into that new structure 
 
-Reader.ask = Reader(x=>x);//ask allows you to inject the/a runtime depedency into a computation without needing to specify ahead of time what it is
-
-//silly helper
-Reader.binary = fn => x => Reader.ask.map(y => fn(y, x));
-Reader.exec = x => Reader.ask.map(fn => fn(x));
-Reader.invoke = methodname => x => Reader.ask.map(invoke(methodname)).ap(Reader.of(x));
+//silly helpers
+Reader.binary = fn => x => Reader.ask.map(y => fn(y, x));//specify a binary function that will call run's(y) and x
+Reader.exec = x => Reader.ask.map(fn => fn(x));//for single functions
+Reader.invoke = methodname => x => Reader.ask.map(invoke(methodname)).ap(Reader.of(x));//for interfaces w/ named methods
+Reader.invoker = methodname => R => R.chain(x => Reader.ask.map(invoke(methodname)).ap(Reader.of(x)));//for interfaces w/ named methods
+Reader.run = x => R => R.run(x); 
 
 module.exports = Reader;
 
