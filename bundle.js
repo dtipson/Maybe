@@ -8,7 +8,7 @@ const IO = require('./src/other-types/IO.js');
 const Reader = require('./src/other-types/Reader.js');
 const State = require('./src/other-types/State.js');
 const Tuple = require('./src/other-types/Tuple.js');
-const Writer = require('./src/other-types/Writer.js');
+const Writer = require('./src/other-types/Writer-array.js');
 
 Object.assign(
   window, 
@@ -20,7 +20,7 @@ Object.assign(
   require('./src/other-types/Validation.js'),
   require('./src/other-types/utility.js')
 );
-},{"./src/Maybe.js":2,"./src/other-types/Array-helpers.js":3,"./src/other-types/Const.js":4,"./src/other-types/Continuation.js":5,"./src/other-types/Either.js":6,"./src/other-types/IO.js":7,"./src/other-types/Identity.js":8,"./src/other-types/Promise-helpers.js":9,"./src/other-types/Reader.js":10,"./src/other-types/State.js":11,"./src/other-types/Tuple.js":12,"./src/other-types/Validation.js":13,"./src/other-types/Writer.js":14,"./src/other-types/monoids.js":15,"./src/other-types/pointfree.js":16,"./src/other-types/utility.js":17}],2:[function(require,module,exports){
+},{"./src/Maybe.js":2,"./src/other-types/Array-helpers.js":3,"./src/other-types/Const.js":4,"./src/other-types/Continuation.js":5,"./src/other-types/Either.js":6,"./src/other-types/IO.js":7,"./src/other-types/Identity.js":8,"./src/other-types/Promise-helpers.js":9,"./src/other-types/Reader.js":10,"./src/other-types/State.js":11,"./src/other-types/Tuple.js":12,"./src/other-types/Validation.js":13,"./src/other-types/Writer-array.js":14,"./src/other-types/monoids.js":15,"./src/other-types/pointfree.js":16,"./src/other-types/utility.js":17}],2:[function(require,module,exports){
 const {curry, compose, head, init, last, tail, prop}  = require('../src/other-types/pointfree.js');
 
 function Maybe(){//create a prototype for Nothing/Just to inherit from
@@ -91,11 +91,9 @@ Object.assign(Maybe, {
   fromNullable,
   fromFilter: fn => x => fn(x) ? Just(x) : Nothing,
   maybe: curry((nothingVal, justFn, M) => M.reduce( (_,x) => justFn(x), nothingVal )),//no accumulator usage
-  head: compose(fromNullable, head),
-  tail: compose(fromNullable, tail),
-  init: compose(fromNullable, init),
-  last: compose(fromNullable, last),
-  prop: namespace => compose(fromNullable, prop(namespace))
+  head: compose(fromNullable, head),//safehead
+  last: compose(fromNullable, last),//safelast
+  prop: namespace => compose(fromNullable, prop(namespace))//safeprop
 });
 
 const maybe = Maybe.maybe;//pretty important pattern, yo
@@ -679,14 +677,15 @@ Reader.of = Reader.prototype.of;
 
 //ask allows you to inject the/a runtime depedency into a computation without needing to specify ahead of time what it is
 Reader.ask = Reader(x=>x);
-//it's super tricky when you think about how it works, because you're mapping over the value in IT, but because it's used inside a chain, you're basically exiting out of the inner value and substituting in the run() value. The inner value only survives if it's passed into that new structure 
+//it's super tricky when you think about how it works, because you're mapping over the value inside ask to get at it, but because it's just a passthrough func, and it's used inside a chain, you're basically exiting out of the inner value and substituting in the run() value. The layer you're working on is removed and the passthrough is left inside. The inner value only survives if it's passed into that new structure!
 
 //silly helpers
 Reader.binary = fn => x => Reader.ask.map(y => fn(y, x));//specify a binary function that will call run's(y) and x
 Reader.exec = x => Reader.ask.map(fn => fn(x));//for single functions
+Reader.execer = R => R.chain(x => Reader.ask.map(fn => fn(x)));//for single functions, baking in chain
 Reader.invoke = methodname => x => Reader.ask.map(invoke(methodname)).ap(Reader.of(x));//for interfaces w/ named methods
-Reader.invoker = methodname => R => R.chain(x => Reader.ask.map(invoke(methodname)).ap(Reader.of(x)));//for interfaces w/ named methods
-Reader.run = x => R => R.run(x); 
+Reader.invoker = methodname => R => R.chain(x => Reader.ask.map(invoke(methodname)).ap(Reader.of(x)));//for interfaces w/ named methods, baking in the chain
+Reader.run = x => R => R.run(x);//can be used inline in a composition to resolve a reader layer
 
 module.exports = Reader;
 
@@ -695,6 +694,7 @@ module.exports = Reader;
 
 //invoke a method on an interface to be passed in later!
 //Reader.of(6).chain(Reader.invoke('increment')).run({increment:x=>x+1})
+//compose(map(x=>x*2), Reader.invoker('transform'), map(x=>x+1), Reader.of)(9).run({transform:x=>x+6})
 },{"../../src/other-types/pointfree.js":16}],11:[function(require,module,exports){
 const {curry}  = require('../../src/other-types/pointfree.js');
 
@@ -946,25 +946,25 @@ function Writer(l, v) {
   if (!(this instanceof Writer)) {
     return new Writer(l,v);
   }
-  this[0] = String(l).trim();//log
+  this[0] = Array.isArray(l)?l:[l];//log must be an array but we can be sloppy and convert it
   this[1] = v;//value
 }
 
-Writer.of = (x) => new Writer('', x);//'' is the "empty" type of string
+Writer.of = (x) => new Writer([], x);//[] is the "empty" type of array
 Writer.prototype.of = Writer.of;
 
 Writer.prototype.chain = function(f){
   const tuple = f(this[1]);
-  return new Writer(this[0].concat(' ',tuple[0]), tuple[1]);
+  return new Writer(this[0].concat(tuple[0]), tuple[1]);
 }
 Writer.prototype.map = function(f){
   return new Writer( this[0], f(this[1]) );
 }
 Writer.prototype.ap = function(wr){
-  return Writer( this[0].concat(' ', wr[0]), this[1](wr[1]) );
+  return Writer( this[0].concat(wr[0]), this[1](wr[1]) );
 }
 Writer.prototype.fst = function(){return this[0]};
-Writer.prototype.snd = function(){return this[1]};
+Writer.prototype.snd = Writer.prototype.extract = function(){return this[1]};
 Writer.prototype.swap = function(){return Writer(this[1],this[0])};
 
 
@@ -973,7 +973,7 @@ const writerize = Writer.lift = (log, fn) => x => Writer(log, fn(x));
 
 //semigroup
 Writer.prototype.concat = function(wr){
-  return Writer( this[0].concat(' ',wr[0]), this[1].concat(wr[1]) );
+  return Writer( this[0].concat(wr[0]), this[1].concat(wr[1]) );
 }
 //allows merging of Writers, as long as both the log and values are of the same semigroup.
 
@@ -1132,7 +1132,7 @@ const concat = curry( (x, y) => x.concat(y));
 const head = xs => xs[0];
 const tail = xs => xs.slice(1, Infinity);
 const init = xs => xs.slice(0,-1);
-const last = xs => xs.slice(-1);
+const last = xs => xs.slice(-1)[0];
 const prop = namespace => obj => obj[namespace];
 
 const mconcat = (xs, empty) => xs.length ? xs.reduce(concat) : empty();

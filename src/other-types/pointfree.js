@@ -24,7 +24,7 @@ const concat = curry( (x, y) => x.concat(y));
 const head = xs => xs[0];
 const tail = xs => xs.slice(1, Infinity);
 const init = xs => xs.slice(0,-1);
-const last = xs => xs.slice(-1);
+const last = xs => xs.slice(-1)[0];
 const prop = namespace => obj => obj[namespace];
 
 const mconcat = (xs, empty) => xs.length ? xs.reduce(concat) : empty();

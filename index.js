@@ -7,7 +7,7 @@ const IO = require('./src/other-types/IO.js');
 const Reader = require('./src/other-types/Reader.js');
 const State = require('./src/other-types/State.js');
 const Tuple = require('./src/other-types/Tuple.js');
-const Writer = require('./src/other-types/Writer.js');
+const Writer = require('./src/other-types/Writer-array.js');
 
 Object.assign(
   window, 

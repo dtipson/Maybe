@@ -68,11 +68,9 @@ Object.assign(Maybe, {
   fromNullable,
   fromFilter: fn => x => fn(x) ? Just(x) : Nothing,
   maybe: curry((nothingVal, justFn, M) => M.reduce( (_,x) => justFn(x), nothingVal )),//no accumulator usage
-  head: compose(fromNullable, head),
-  tail: compose(fromNullable, tail),
-  init: compose(fromNullable, init),
-  last: compose(fromNullable, last),
-  prop: namespace => compose(fromNullable, prop(namespace))
+  head: compose(fromNullable, head),//safehead
+  last: compose(fromNullable, last),//safelast
+  prop: namespace => compose(fromNullable, prop(namespace))//safeprop
 });
 
 const maybe = Maybe.maybe;//pretty important pattern, yo

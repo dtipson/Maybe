@@ -32,14 +32,15 @@ Reader.of = Reader.prototype.of;
 
 //ask allows you to inject the/a runtime depedency into a computation without needing to specify ahead of time what it is
 Reader.ask = Reader(x=>x);
-//it's super tricky when you think about how it works, because you're mapping over the value in IT, but because it's used inside a chain, you're basically exiting out of the inner value and substituting in the run() value. The inner value only survives if it's passed into that new structure 
+//it's super tricky when you think about how it works, because you're mapping over the value inside ask to get at it, but because it's just a passthrough func, and it's used inside a chain, you're basically exiting out of the inner value and substituting in the run() value. The layer you're working on is removed and the passthrough is left inside. The inner value only survives if it's passed into that new structure!
 
 //silly helpers
 Reader.binary = fn => x => Reader.ask.map(y => fn(y, x));//specify a binary function that will call run's(y) and x
 Reader.exec = x => Reader.ask.map(fn => fn(x));//for single functions
+Reader.execer = R => R.chain(x => Reader.ask.map(fn => fn(x)));//for single functions, baking in chain
 Reader.invoke = methodname => x => Reader.ask.map(invoke(methodname)).ap(Reader.of(x));//for interfaces w/ named methods
-Reader.invoker = methodname => R => R.chain(x => Reader.ask.map(invoke(methodname)).ap(Reader.of(x)));//for interfaces w/ named methods
-Reader.run = x => R => R.run(x); 
+Reader.invoker = methodname => R => R.chain(x => Reader.ask.map(invoke(methodname)).ap(Reader.of(x)));//for interfaces w/ named methods, baking in the chain
+Reader.run = x => R => R.run(x);//can be used inline in a composition to resolve a reader layer
 
 module.exports = Reader;
 
@@ -48,3 +49,4 @@ module.exports = Reader;
 
 //invoke a method on an interface to be passed in later!
 //Reader.of(6).chain(Reader.invoke('increment')).run({increment:x=>x+1})
+//compose(map(x=>x*2), Reader.invoker('transform'), map(x=>x+1), Reader.of)(9).run({transform:x=>x+6})
