@@ -1,4 +1,4 @@
-const {curry, K, I}  = require('../../src/other-types/pointfree.js');
+const {curry, K, I, mconcat, ap}  = require('../../src/other-types/pointfree.js');
 
 function Validation(failure, success){
   return success === null ? new Success(right) : new Failure(left);
@@ -8,7 +8,7 @@ const Failure = function(x){
   if (!(this instanceof Failure)) {
     return new Failure(x);
   }
-  this.e = x;//storing the value in the instance
+  this.e = Array.isArray(x) ? x : [x];//storing the value in the instance
 };
 
 Failure.prototype = Object.create(Validation.prototype);
@@ -62,6 +62,28 @@ Validation.prototype.getOrElse = function(a) {
   });
 }
 
+Success.prototype.concat = function(b) {
+  return b.cata({
+    Failure: e => b,
+    Success: s => this.s
+  });
+}
+
+Failure.prototype.concat = function(b) {
+  return b.cata({
+    Failure: e => Failure(this.e.concat(e)),
+    Success: s => b
+  });
+}
+
+Validation.prototype.getOrElse = function(a) {
+  return this.cata({
+    Failure: e => a,
+    Success: _ => this.s
+  });
+}
+
+
 //probably not right
 Failure.prototype.sequence = function(of) {
   return this.e.map(Failure);
@@ -100,7 +122,10 @@ Validation.fromMaybe = Validation.prototype.fromMaybe;
 Validation.fromEither = Validation.prototype.fromEither;
 
 //not quite working
-const aggregateValidations = (...testList) => testValue => testList.traverse(test=>test(testValue), Validation.of);
+const aggregateValidationsFailed = (...testList) => testValue => testList.traverse(test=>test(testValue), Validation.of);
+
+const aggregateValidations = (arrayOfTests) => compose(mconcat, ap(arrayOfTests), Array.of);
+
 
 module.exports = {
   Validation,

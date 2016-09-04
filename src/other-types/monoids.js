@@ -15,6 +15,7 @@ Endo.empty = _ => Endo(x=>x);
 Endo.prototype.concat = function(y) {
   return Endo(compose(this.appEndo,y.appEndo));
 };
+Endo.prototype.getResult = function() { return this.appEndo; }
 
 //concat is just composition
 Endo.prototype.concat = function(y) {
@@ -106,10 +107,12 @@ Sum.prototype.concat = function(y) {
 //Max 
 //Min, etc. all require some further constraints, like Ord
 
+const getResult = M => M.getResult ? M.getResult() : M.x;
 
 module.exports = {
   Sum,
   Any,
   All,
-  Endo
+  Endo,
+  getResult
 }

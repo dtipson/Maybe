@@ -11,9 +11,9 @@ const S = b => f => x => b(x,f(x));
 //String -> Object -> Arguments -> ?
 const invoke = methodname => obj => (...args) => obj[methodname](...args);
 
-const ap = curry((A,A2) => A.ap(A2));
-const map = curry((f,F) => F.map(x=>f(x)));//guard against Array.map
-const reduce = curry((f,acc,F) => F.reduce(f,acc));
+const ap = curry((A, A2) => A.ap(A2));
+const map = curry((f, F) => F.map(x=>f(x)));//guard against Array.map
+const reduce = curry((f, acc, F) => F.reduce(f,acc));
 const chain = curry((f, M) => M.chain(f));
 const liftA2 = curry((f, A1, A2) => A1.map(f).ap(A2));
 const liftA3 = curry((f, A1, A2, A3) => A1.map(f).ap(A2).ap(A3));

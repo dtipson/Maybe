@@ -2,7 +2,7 @@
 require('./src/other-types/Array-helpers.js');
 require('./src/other-types/Promise-helpers.js');
 const Const = require('./src/other-types/Const.js');
-const Continuation = require('./src/other-types/Continuation.js');
+const Continuation = require('./src/other-types/Continuation.js');//total nonsense, really
 const Identity = require('./src/other-types/Identity.js');
 const IO = require('./src/other-types/IO.js');
 const Reader = require('./src/other-types/Reader.js');
@@ -13,6 +13,7 @@ const Writer = require('./src/other-types/Writer-array.js');
 Object.assign(
   window, 
   require('./src/Maybe.js'),
+  require('./src/media-recorder/videobooth.js'),
   require('./src/other-types/Either.js'),
   {Const, Continuation, Cont:Continuation, Identity, IO, Reader, Tuple, State, Writer},
   require('./src/other-types/pointfree.js'),
@@ -20,7 +21,7 @@ Object.assign(
   require('./src/other-types/Validation.js'),
   require('./src/other-types/utility.js')
 );
-},{"./src/Maybe.js":2,"./src/other-types/Array-helpers.js":3,"./src/other-types/Const.js":4,"./src/other-types/Continuation.js":5,"./src/other-types/Either.js":6,"./src/other-types/IO.js":7,"./src/other-types/Identity.js":8,"./src/other-types/Promise-helpers.js":9,"./src/other-types/Reader.js":10,"./src/other-types/State.js":11,"./src/other-types/Tuple.js":12,"./src/other-types/Validation.js":13,"./src/other-types/Writer-array.js":14,"./src/other-types/monoids.js":15,"./src/other-types/pointfree.js":16,"./src/other-types/utility.js":17}],2:[function(require,module,exports){
+},{"./src/Maybe.js":2,"./src/media-recorder/videobooth.js":3,"./src/other-types/Array-helpers.js":4,"./src/other-types/Const.js":5,"./src/other-types/Continuation.js":6,"./src/other-types/Either.js":7,"./src/other-types/IO.js":8,"./src/other-types/Identity.js":9,"./src/other-types/Promise-helpers.js":10,"./src/other-types/Reader.js":11,"./src/other-types/State.js":12,"./src/other-types/Tuple.js":13,"./src/other-types/Validation.js":14,"./src/other-types/Writer-array.js":15,"./src/other-types/monoids.js":16,"./src/other-types/pointfree.js":17,"./src/other-types/utility.js":18}],2:[function(require,module,exports){
 const {curry, compose, head, init, last, tail, prop}  = require('../src/other-types/pointfree.js');
 
 function Maybe(){//create a prototype for Nothing/Just to inherit from
@@ -230,7 +231,175 @@ const process = maybe(create, update, maybeRecord);
 
 process(4);
 */
-},{"../src/other-types/pointfree.js":16}],3:[function(require,module,exports){
+},{"../src/other-types/pointfree.js":17}],3:[function(require,module,exports){
+const {Maybe, Nothing, Just} = require('../../src/Maybe.js');
+
+const createVideo = videoURL => {
+
+  console.log('creating video w/',videoURL);
+
+  var video = document.createElement('video');
+
+  video.addEventListener('error', e => {
+    console.log('video play error', e, video.error);
+    Maybe.fromNullable(video.parentNode).map(x => x.removeChild(video));
+  }, true);
+
+  video.controls = false;
+  video.className = 'grid-video';
+  video.autoplay = false;
+  video.muted = true;
+  video.loop = true;
+  video.width = 320;
+  video.height = 240;
+
+  video.src = videoURL;
+
+  video.onloadedmetadata = function(e) {
+    video.play();
+  }
+
+  return video;
+};
+
+const appendToBody = el => {
+  document.body.appendChild(el);
+}
+
+const createMediaRecorder = stream => {
+  let mediaRecorder;
+  var options = {mimeType: 'video/webm;codecs=vp9'};
+  if (!MediaRecorder.isTypeSupported(options.mimeType)) {
+    console.log(options.mimeType + ' is not Supported');
+    options.mimeType= 'video/webm;codecs=vp8';
+    if (!MediaRecorder.isTypeSupported(options.mimeType)) {
+      console.log(options.mimeType + ' is not Supported');
+      options.mimeType = 'video/webm';
+      if (!MediaRecorder.isTypeSupported(options.mimeType)) {
+        console.log(options.mimeType + ' is not Supported');
+        options.mimeType= '';
+      }
+    }
+  }
+  try {
+    mediaRecorder = new MediaRecorder(stream, options);
+  } catch (e) {
+    console.error('Exception while creating MediaRecorder: ' + e);
+    console.error('Exception while creating MediaRecorder: '
+      + e + '. mimeType: ' + options.mimeType);
+    return;
+  }
+
+  mediaRecorder.onwarning = e => console.log('mr warning', e);
+
+  return mediaRecorder;
+};
+
+
+const mrDataToBlobUrl = event => {
+    return window.URL.createObjectURL(event.data);
+};
+
+
+const recorder = mediaRecorder => recordForMS => {
+
+  let time = performance.now();
+
+  console.log('preparing to record for', recordForMS);
+
+  return new Promise((resolve, reject)=>{
+
+    const startRecording = _ => setTimeout(()=>{
+
+      mediaRecorder.ondataavailable = event => {
+        console.log('got data',mediaRecorder.state);
+        if(event && event.data && event.data.size > 1){
+          console.log('record time',performance.now()-time);
+          if(mediaRecorder.state === "recording") {
+            mediaRecorder.onpause = e => resolve(event);
+            mediaRecorder.pause();
+          }else{
+            resolve(event);
+          }
+        }
+      };
+
+      mediaRecorder.requestData();
+
+    }, recordForMS);
+
+    mediaRecorder.onerror = e => !console.log('mr error', e) && reject(e);
+
+    if(mediaRecorder.state === "paused") {
+
+      mediaRecorder.onresume = e => startRecording();
+
+      mediaRecorder.resume();
+    }else{
+      startRecording();
+    }
+
+
+  });
+
+};
+
+const handleError = e => console.error('fatal error in chain',e);
+
+const delay = milliseconds => new Promise(resolve => setTimeout(resolve, milliseconds));
+
+const recordClips = number => stream => {
+  const mr = createRecorder(stream);
+  const recordFor = time => recorder(mr)(time).then(url=> !console.log(url) && url).then(mrDataToBlobUrl).then(createVideo).then(appendToBody);
+
+  const startMR = _ => new Promise(resolve => {
+    mr.onstart = e => !console.log('starting, state is', e.currentTarget.state) && resolve(e);
+    mr.start();
+  });
+  
+  return Array.from({length:number}).reduce(
+    P => P.then(_=>console.log('rec')).then(_ => recordFor(2000)), 
+    delay(1400).then(startMR)
+  ).then(_ => {
+      mr.stop();
+      closeStream(stream);
+  }).catch(handleError);
+
+};
+
+//closeStream :: Stream -> undefined
+const closeStream = stream => {
+  console.log('closing stream',stream);
+  stream.getAudioTracks().forEach(track => track.stop());
+  stream.getVideoTracks().forEach(track => track.stop());
+}
+
+//requestRecord :: Object (optional) -> Promise Stream
+const requestRecord = (config={video:true, audio:true}) => {
+  return navigator.mediaDevices && navigator.mediaDevices.getUserMedia ? 
+    navigator.mediaDevices.getUserMedia(config) :
+    Promise.reject('no support for getUserMedia');
+};
+
+
+// var muted = true;
+
+// $('button').on('click',function(e){
+//   $('video').get().forEach(function(v){
+//     v.muted = !muted;
+//   });
+//   $(this).toggleClass('unmuted',muted);
+//   muted = !muted;
+// });
+
+
+module.exports = {
+  appendToBody,
+  createVideo,
+  createMediaRecorder,
+  requestRecord
+};
+},{"../../src/Maybe.js":2}],4:[function(require,module,exports){
 Array.empty = _ => [];
 Array.prototype.flatten = function(){return [].concat(...this); };
 //we need to guard the f against the extra args that native Array.map passes to avoid silly results
@@ -256,7 +425,7 @@ Array.prototype.sequence = function(point){
 Array.prototype.traverse = function(f, point){
     return this.map(f).sequence(point);
 };
-},{}],4:[function(require,module,exports){
+},{}],5:[function(require,module,exports){
 function Const(value) {
   if (!(this instanceof Const)) {
     return new Const(value);
@@ -283,7 +452,7 @@ module.exports = Const;
   }
 
 */
-},{}],5:[function(require,module,exports){
+},{}],6:[function(require,module,exports){
 //lots of similarities here to Task, which is a sort of this married to an Either
 //fork and handler are very similar: computation doesn't run until fork is calleds
 
@@ -407,7 +576,7 @@ doCont(
 )(alertMe);
 
 */
-},{}],6:[function(require,module,exports){
+},{}],7:[function(require,module,exports){
 const {curry, K, I}  = require('../../src/other-types/pointfree.js');
 
 function Either(...args){
@@ -505,7 +674,7 @@ module.exports = {
   Left,
   Right
 };
-},{"../../src/other-types/pointfree.js":16}],7:[function(require,module,exports){
+},{"../../src/other-types/pointfree.js":17}],8:[function(require,module,exports){
 function IO(fn) {
   if (!(this instanceof IO)) {
     return new IO(fn);
@@ -543,7 +712,7 @@ IO.$ = selectorString => new IO(_ => Array.from(document.querySelectorAll(select
 
 
 module.exports = IO;
-},{}],8:[function(require,module,exports){
+},{}],9:[function(require,module,exports){
 function Identity(v) {
   if (!(this instanceof Identity)) {
     return new Identity(v);
@@ -575,7 +744,7 @@ Identity.prototype.equals = function(that){
 
 
 module.exports = Identity;
-},{}],9:[function(require,module,exports){
+},{}],10:[function(require,module,exports){
 Promise.prototype.of = Promise.resolve;
 Promise.of = x => Promise.resolve(x);
 Promise.prototype.map = Promise.prototype.chain = Promise.prototype.then;
@@ -642,7 +811,7 @@ Promise.prototype.orElse = function _orElse(f) {
 
 
 
-},{}],10:[function(require,module,exports){
+},{}],11:[function(require,module,exports){
 const {invoke}  = require('../../src/other-types/pointfree.js');
 
 
@@ -695,7 +864,7 @@ module.exports = Reader;
 //invoke a method on an interface to be passed in later!
 //Reader.of(6).chain(Reader.invoke('increment')).run({increment:x=>x+1})
 //compose(map(x=>x*2), Reader.invoker('transform'), map(x=>x+1), Reader.of)(9).run({transform:x=>x+6})
-},{"../../src/other-types/pointfree.js":16}],11:[function(require,module,exports){
+},{"../../src/other-types/pointfree.js":17}],12:[function(require,module,exports){
 const {curry}  = require('../../src/other-types/pointfree.js');
 
 var Identity = require('./Identity');
@@ -782,7 +951,7 @@ State.prototype.run = function(s) {
 };
 
 module.exports = State;
-},{"../../src/other-types/pointfree.js":16,"./Identity":8,"./Tuple":12,"./utility":17}],12:[function(require,module,exports){
+},{"../../src/other-types/pointfree.js":17,"./Identity":9,"./Tuple":13,"./utility":18}],13:[function(require,module,exports){
 function Tuple(x, y) {
   if (!(this instanceof Tuple)) {
     return new Tuple(x,y);
@@ -830,8 +999,8 @@ Tuple.prototype.sequence = function(of){
 }
 
 module.exports = Tuple;
-},{}],13:[function(require,module,exports){
-const {curry, K, I}  = require('../../src/other-types/pointfree.js');
+},{}],14:[function(require,module,exports){
+const {curry, K, I, mconcat, ap}  = require('../../src/other-types/pointfree.js');
 
 function Validation(failure, success){
   return success === null ? new Success(right) : new Failure(left);
@@ -841,7 +1010,7 @@ const Failure = function(x){
   if (!(this instanceof Failure)) {
     return new Failure(x);
   }
-  this.e = x;//storing the value in the instance
+  this.e = Array.isArray(x) ? x : [x];//storing the value in the instance
 };
 
 Failure.prototype = Object.create(Validation.prototype);
@@ -895,6 +1064,28 @@ Validation.prototype.getOrElse = function(a) {
   });
 }
 
+Success.prototype.concat = function(b) {
+  return b.cata({
+    Failure: e => b,
+    Success: s => this.s
+  });
+}
+
+Failure.prototype.concat = function(b) {
+  return b.cata({
+    Failure: e => Failure(this.e.concat(e)),
+    Success: s => b
+  });
+}
+
+Validation.prototype.getOrElse = function(a) {
+  return this.cata({
+    Failure: e => a,
+    Success: _ => this.s
+  });
+}
+
+
 //probably not right
 Failure.prototype.sequence = function(of) {
   return this.e.map(Failure);
@@ -933,7 +1124,10 @@ Validation.fromMaybe = Validation.prototype.fromMaybe;
 Validation.fromEither = Validation.prototype.fromEither;
 
 //not quite working
-const aggregateValidations = (...testList) => testValue => testList.traverse(test=>test(testValue), Validation.of);
+const aggregateValidationsFailed = (...testList) => testValue => testList.traverse(test=>test(testValue), Validation.of);
+
+const aggregateValidations = (arrayOfTests) => compose(mconcat, ap(arrayOfTests), Array.of);
+
 
 module.exports = {
   Validation,
@@ -941,7 +1135,7 @@ module.exports = {
   Success,
   aggregateValidations
 };
-},{"../../src/other-types/pointfree.js":16}],14:[function(require,module,exports){
+},{"../../src/other-types/pointfree.js":17}],15:[function(require,module,exports){
 function Writer(l, v) {
   if (!(this instanceof Writer)) {
     return new Writer(l,v);
@@ -989,7 +1183,7 @@ Writer.prototype.sequence = function(of){
 }
 
 module.exports = Writer;
-},{}],15:[function(require,module,exports){
+},{}],16:[function(require,module,exports){
 String.prototype.empty = x => '';//makes string a well behaved monoid for left to right cases
 String.empty = String.prototype.empty;
 
@@ -1007,6 +1201,7 @@ Endo.empty = _ => Endo(x=>x);
 Endo.prototype.concat = function(y) {
   return Endo(compose(this.appEndo,y.appEndo));
 };
+Endo.prototype.getResult = function() { return this.appEndo; }
 
 //concat is just composition
 Endo.prototype.concat = function(y) {
@@ -1098,14 +1293,16 @@ Sum.prototype.concat = function(y) {
 //Max 
 //Min, etc. all require some further constraints, like Ord
 
+const getResult = M => M.getResult ? M.getResult() : M.x;
 
 module.exports = {
   Sum,
   Any,
   All,
-  Endo
+  Endo,
+  getResult
 }
-},{}],16:[function(require,module,exports){
+},{}],17:[function(require,module,exports){
 const compose  = (fn, ...rest) =>
   rest.length === 0 ?
     (fn||(x=>x)) :
@@ -1119,9 +1316,9 @@ const S = b => f => x => b(x,f(x));
 //String -> Object -> Arguments -> ?
 const invoke = methodname => obj => (...args) => obj[methodname](...args);
 
-const ap = curry((A,A2) => A.ap(A2));
-const map = curry((f,F) => F.map(x=>f(x)));//guard against Array.map
-const reduce = curry((f,acc,F) => F.reduce(f,acc));
+const ap = curry((A, A2) => A.ap(A2));
+const map = curry((f, F) => F.map(x=>f(x)));//guard against Array.map
+const reduce = curry((f, acc, F) => F.reduce(f,acc));
 const chain = curry((f, M) => M.chain(f));
 const liftA2 = curry((f, A1, A2) => A1.map(f).ap(A2));
 const liftA3 = curry((f, A1, A2, A3) => A1.map(f).ap(A2).ap(A3));
@@ -1199,7 +1396,7 @@ module.exports = {
   prop,
   bimap
 };
-},{}],17:[function(require,module,exports){
+},{}],18:[function(require,module,exports){
 (function (global){
 const {curry}  = require('../../src/other-types/pointfree.js');
 
@@ -1268,4 +1465,4 @@ module.exports = {
   Compose
 };
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{"../../src/other-types/pointfree.js":16}]},{},[1]);
+},{"../../src/other-types/pointfree.js":17}]},{},[1]);
