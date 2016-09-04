@@ -111,15 +111,15 @@ Promise.all([Promise.of(x=>x+1).ap(Promise.of(1)),Promise.of(1).map(x=>x+1)]).th
 Or, like:
 
 ```
-aggregate(
+aggregateValidations([
   x => x===3 ? Success(3) : Failure(['not 3']),
-  x => x===3 ? Success(3) : Failure(['not 3']),
-  x => x===3 ? Success(3) : Failure(['not 3'])
-)(8);//-> Failure[["not 3","not 3","not 3"]]
+  x => x===3 ? Success(3) : Failure(['still not 3']),
+  x => x===3 ? Success(3) : Failure(['and again, not a 3'])
+])(8);//-> Failure[["not 3","still not 3","and again, not a 3"]]
 
-aggregate(
+aggregateValidations([
   x => x===3 ? Success(3) : Failure(['not 3']),
-  x => x===3 ? Success(3) : Failure(['not 3']),
-  x => x===3 ? Success(3) : Failure(['not 3'])
-)(3);//-> Success[3]
+  x => x===3 ? Success(3) : Failure(['still not 3']),
+  x => x===3 ? Success(3) : Failure(['and again, not a 3'])
+])(3);//-> Success[3]
 ```
