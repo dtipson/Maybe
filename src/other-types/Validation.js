@@ -126,6 +126,7 @@ const aggregateValidationsFailed = (...testList) => testValue => testList.traver
 
 const aggregateValidations = (arrayOfTests) => compose(mconcat, ap(arrayOfTests), Array.of);
 
+//run values over matching lists, then concat all the lists to get the final validation of all values, success/fail list
 
 module.exports = {
   Validation,
