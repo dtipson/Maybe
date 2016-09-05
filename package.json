@@ -5,13 +5,15 @@
   "main": "index.js",
   "scripts": {
     "test": "tap tests/*.js --cov",
-    "build": "browserify index.js -o bundle.js"
+    "build": "browserify index.js -o bundle.js",
+    "build:watch": "watch 'npm run build' ./src"
   },
   "author": "",
   "license": "ISC",
   "devDependencies": {
     "faucet": "0.0.1",
+    "tap": "~6.3.0",
     "tape": "~4.6.0",
-    "tap": "~6.3.0"
+    "watch": "^0.19.2"
   }
 }

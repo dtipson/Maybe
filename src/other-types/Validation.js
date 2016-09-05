@@ -72,7 +72,7 @@ Success.prototype.concat = function(b) {
 Failure.prototype.concat = function(b) {
   return b.cata({
     Failure: e => Failure(this.e.concat(e)),
-    Success: s => b
+    Success: s => this
   });
 }
 

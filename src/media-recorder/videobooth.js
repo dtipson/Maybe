@@ -30,6 +30,25 @@ const createVideo = videoURL => {
 
 const appendToBody = el => {
   document.body.appendChild(el);
+  return el;
+}
+
+const appendToBodyThenPrepend = limit => el => {
+  const videos = Array.from(document.querySelectorAll('video'));
+  if(!videos.length){
+    document.body.appendChild(el);
+  }
+  else if(videos.length<limit){;
+    document.body.insertBefore(el, videos[0]);
+  }else{
+    const lastVideo = videos.slice(-1)[0];
+    const src = lastVideo.src;
+    
+    document.body.removeChild(lastVideo);
+    window.URL.revokeObjectURL(src);
+    document.body.insertBefore(el, videos[0]);
+  }
+  return el;
 }
 
 const createMediaRecorder = stream => {
@@ -67,7 +86,9 @@ const mrDataToBlobUrl = event => {
 };
 
 
-const recorder = mediaRecorder => recordForMS => {
+const recordFromMRForMs = stream => recordForMS => {
+
+  const mediaRecorder = createMediaRecorder(stream);
 
   let time = performance.now();
 
@@ -75,36 +96,22 @@ const recorder = mediaRecorder => recordForMS => {
 
   return new Promise((resolve, reject)=>{
 
-    const startRecording = _ => setTimeout(()=>{
-
-      mediaRecorder.ondataavailable = event => {
-        console.log('got data',mediaRecorder.state);
-        if(event && event.data && event.data.size > 1){
-          console.log('record time',performance.now()-time);
-          if(mediaRecorder.state === "recording") {
-            mediaRecorder.onpause = e => resolve(event);
-            mediaRecorder.pause();
-          }else{
-            resolve(event);
-          }
+    mediaRecorder.ondataavailable = event => {
+      console.log('got data',mediaRecorder.state, event.data.size);
+      if(event && event.data && event.data.size > 1){
+        console.log('record time', performance.now()-time, 'now stopping');
+        if(mediaRecorder.state === "recording"){
+          mediaRecorder.stop();
         }
-      };
-
-      mediaRecorder.requestData();
-
-    }, recordForMS);
+        resolve(event);
+      }
+    };
 
     mediaRecorder.onerror = e => !console.log('mr error', e) && reject(e);
 
-    if(mediaRecorder.state === "paused") {
+    console.log(mediaRecorder.state,'mediaRecorder.state prerecord');
 
-      mediaRecorder.onresume = e => startRecording();
-
-      mediaRecorder.resume();
-    }else{
-      startRecording();
-    }
-
+    mediaRecorder.start(recordForMS);
 
   });
 
@@ -112,26 +119,38 @@ const recorder = mediaRecorder => recordForMS => {
 
 const handleError = e => console.error('fatal error in chain',e);
 
-const delay = milliseconds => new Promise(resolve => setTimeout(resolve, milliseconds));
+const delay = milliseconds => x => new Promise(resolve => setTimeout(resolve, milliseconds, x));
 
 const recordClips = number => stream => {
-  const mr = createRecorder(stream);
-  const recordFor = time => recorder(mr)(time).then(url=> !console.log(url) && url).then(mrDataToBlobUrl).then(createVideo).then(appendToBody);
-
-  const startMR = _ => new Promise(resolve => {
-    mr.onstart = e => !console.log('starting, state is', e.currentTarget.state) && resolve(e);
-    mr.start();
-  });
+  const recordFor = time => recordFromMRForMs(stream)(time)
+    .then(url=> !console.log(url) && url)
+    .then(mrDataToBlobUrl)
+    .then(createVideo)
+    .then(delay(50))
+    .then(appendToBodyThenPrepend(20));
   
   return Array.from({length:number}).reduce(
-    P => P.then(_=>console.log('rec')).then(_ => recordFor(2000)), 
-    delay(1400).then(startMR)
-  ).then(_ => {
-      mr.stop();
-      closeStream(stream);
-  }).catch(handleError);
+    P => P.then(_=>console.log('rec')).then(_ => recordFor(500)).then(delay(1000)), 
+    Promise.resolve()
+  ).catch(handleError);
 
 };
+
+
+
+const recordInfinite = duration => stream => {
+  console.log('START INFINITE');
+  return recordFromMRForMs(stream)(duration)
+    .then(mrDataToBlobUrl)
+    .then(createVideo)
+    .then(appendToBodyThenPrepend)
+    .then(_ => {
+      console.log(_,'complete, starting next')
+      return recordInfinite(stream)
+    });
+};
+
+
 
 //closeStream :: Stream -> undefined
 const closeStream = stream => {
@@ -143,7 +162,7 @@ const closeStream = stream => {
 //requestRecord :: Object (optional) -> Promise Stream
 const requestRecord = (config={video:true, audio:true}) => {
   return navigator.mediaDevices && navigator.mediaDevices.getUserMedia ? 
-    navigator.mediaDevices.getUserMedia(config) :
+    navigator.mediaDevices.getUserMedia(config).then(delay(1400)) ://extra delay at the start is to avoid the webcam flash
     Promise.reject('no support for getUserMedia');
 };
 
@@ -162,6 +181,20 @@ const requestRecord = (config={video:true, audio:true}) => {
 module.exports = {
   appendToBody,
   createVideo,
+  mrDataToBlobUrl,
   createMediaRecorder,
-  requestRecord
+  requestRecord,
+  recordFromMRForMs,
+  recordInfinite,
+  closeStream,
+  recordClips
 };
+
+//single cycle
+//requestRecord().then(stream => recordFromMRForMs(createMediaRecorder(stream))(6900).then(mrDataToBlobUrl).then(createVideo).then(appendToBody).then(_=>closeStream(stream)))
+
+// document.body.innerHTML = '';
+// requestRecord().then(stream => {
+//   recordClips(300)(stream)
+//     .then(_=>closeStream(stream))
+// });

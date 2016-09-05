@@ -7,6 +7,7 @@ const Identity = require('./src/other-types/Identity.js');
 const IO = require('./src/other-types/IO.js');
 const Reader = require('./src/other-types/Reader.js');
 const State = require('./src/other-types/State.js');
+const Store = require('./src/other-types/Store.js');
 const Tuple = require('./src/other-types/Tuple.js');
 const Writer = require('./src/other-types/Writer-array.js');
 
@@ -15,13 +16,13 @@ Object.assign(
   require('./src/Maybe.js'),
   require('./src/media-recorder/videobooth.js'),
   require('./src/other-types/Either.js'),
-  {Const, Continuation, Cont:Continuation, Identity, IO, Reader, Tuple, State, Writer},
+  {Const, Continuation, Cont:Continuation, Identity, IO, Reader, Tuple, State, Store, Writer},
   require('./src/other-types/pointfree.js'),
   require('./src/other-types/monoids.js'),
   require('./src/other-types/Validation.js'),
   require('./src/other-types/utility.js')
 );
-},{"./src/Maybe.js":2,"./src/media-recorder/videobooth.js":3,"./src/other-types/Array-helpers.js":4,"./src/other-types/Const.js":5,"./src/other-types/Continuation.js":6,"./src/other-types/Either.js":7,"./src/other-types/IO.js":8,"./src/other-types/Identity.js":9,"./src/other-types/Promise-helpers.js":10,"./src/other-types/Reader.js":11,"./src/other-types/State.js":12,"./src/other-types/Tuple.js":13,"./src/other-types/Validation.js":14,"./src/other-types/Writer-array.js":15,"./src/other-types/monoids.js":16,"./src/other-types/pointfree.js":17,"./src/other-types/utility.js":18}],2:[function(require,module,exports){
+},{"./src/Maybe.js":2,"./src/media-recorder/videobooth.js":3,"./src/other-types/Array-helpers.js":4,"./src/other-types/Const.js":5,"./src/other-types/Continuation.js":6,"./src/other-types/Either.js":7,"./src/other-types/IO.js":8,"./src/other-types/Identity.js":9,"./src/other-types/Promise-helpers.js":10,"./src/other-types/Reader.js":11,"./src/other-types/State.js":12,"./src/other-types/Store.js":13,"./src/other-types/Tuple.js":14,"./src/other-types/Validation.js":15,"./src/other-types/Writer-array.js":16,"./src/other-types/monoids.js":17,"./src/other-types/pointfree.js":18,"./src/other-types/utility.js":19}],2:[function(require,module,exports){
 const {curry, compose, head, init, last, tail, prop}  = require('../src/other-types/pointfree.js');
 
 function Maybe(){//create a prototype for Nothing/Just to inherit from
@@ -231,7 +232,7 @@ const process = maybe(create, update, maybeRecord);
 
 process(4);
 */
-},{"../src/other-types/pointfree.js":17}],3:[function(require,module,exports){
+},{"../src/other-types/pointfree.js":18}],3:[function(require,module,exports){
 const {Maybe, Nothing, Just} = require('../../src/Maybe.js');
 
 const createVideo = videoURL => {
@@ -264,6 +265,25 @@ const createVideo = videoURL => {
 
 const appendToBody = el => {
   document.body.appendChild(el);
+  return el;
+}
+
+const appendToBodyThenPrepend = limit => el => {
+  const videos = Array.from(document.querySelectorAll('video'));
+  if(!videos.length){
+    document.body.appendChild(el);
+  }
+  else if(videos.length<limit){;
+    document.body.insertBefore(el, videos[0]);
+  }else{
+    const lastVideo = videos.slice(-1)[0];
+    const src = lastVideo.src;
+    
+    document.body.removeChild(lastVideo);
+    window.URL.revokeObjectURL(src);
+    document.body.insertBefore(el, videos[0]);
+  }
+  return el;
 }
 
 const createMediaRecorder = stream => {
@@ -301,7 +321,9 @@ const mrDataToBlobUrl = event => {
 };
 
 
-const recorder = mediaRecorder => recordForMS => {
+const recordFromMRForMs = stream => recordForMS => {
+
+  const mediaRecorder = createMediaRecorder(stream);
 
   let time = performance.now();
 
@@ -309,36 +331,22 @@ const recorder = mediaRecorder => recordForMS => {
 
   return new Promise((resolve, reject)=>{
 
-    const startRecording = _ => setTimeout(()=>{
-
-      mediaRecorder.ondataavailable = event => {
-        console.log('got data',mediaRecorder.state);
-        if(event && event.data && event.data.size > 1){
-          console.log('record time',performance.now()-time);
-          if(mediaRecorder.state === "recording") {
-            mediaRecorder.onpause = e => resolve(event);
-            mediaRecorder.pause();
-          }else{
-            resolve(event);
-          }
+    mediaRecorder.ondataavailable = event => {
+      console.log('got data',mediaRecorder.state, event.data.size);
+      if(event && event.data && event.data.size > 1){
+        console.log('record time', performance.now()-time, 'now stopping');
+        if(mediaRecorder.state === "recording"){
+          mediaRecorder.stop();
         }
-      };
-
-      mediaRecorder.requestData();
-
-    }, recordForMS);
+        resolve(event);
+      }
+    };
 
     mediaRecorder.onerror = e => !console.log('mr error', e) && reject(e);
 
-    if(mediaRecorder.state === "paused") {
+    console.log(mediaRecorder.state,'mediaRecorder.state prerecord');
 
-      mediaRecorder.onresume = e => startRecording();
-
-      mediaRecorder.resume();
-    }else{
-      startRecording();
-    }
-
+    mediaRecorder.start(recordForMS);
 
   });
 
@@ -346,26 +354,38 @@ const recorder = mediaRecorder => recordForMS => {
 
 const handleError = e => console.error('fatal error in chain',e);
 
-const delay = milliseconds => new Promise(resolve => setTimeout(resolve, milliseconds));
+const delay = milliseconds => x => new Promise(resolve => setTimeout(resolve, milliseconds, x));
 
 const recordClips = number => stream => {
-  const mr = createRecorder(stream);
-  const recordFor = time => recorder(mr)(time).then(url=> !console.log(url) && url).then(mrDataToBlobUrl).then(createVideo).then(appendToBody);
-
-  const startMR = _ => new Promise(resolve => {
-    mr.onstart = e => !console.log('starting, state is', e.currentTarget.state) && resolve(e);
-    mr.start();
-  });
+  const recordFor = time => recordFromMRForMs(stream)(time)
+    .then(url=> !console.log(url) && url)
+    .then(mrDataToBlobUrl)
+    .then(createVideo)
+    .then(delay(50))
+    .then(appendToBodyThenPrepend(20));
   
   return Array.from({length:number}).reduce(
-    P => P.then(_=>console.log('rec')).then(_ => recordFor(2000)), 
-    delay(1400).then(startMR)
-  ).then(_ => {
-      mr.stop();
-      closeStream(stream);
-  }).catch(handleError);
+    P => P.then(_=>console.log('rec')).then(_ => recordFor(500)).then(delay(1000)), 
+    Promise.resolve()
+  ).catch(handleError);
 
 };
+
+
+
+const recordInfinite = duration => stream => {
+  console.log('START INFINITE');
+  return recordFromMRForMs(stream)(duration)
+    .then(mrDataToBlobUrl)
+    .then(createVideo)
+    .then(appendToBodyThenPrepend)
+    .then(_ => {
+      console.log(_,'complete, starting next')
+      return recordInfinite(stream)
+    });
+};
+
+
 
 //closeStream :: Stream -> undefined
 const closeStream = stream => {
@@ -377,7 +397,7 @@ const closeStream = stream => {
 //requestRecord :: Object (optional) -> Promise Stream
 const requestRecord = (config={video:true, audio:true}) => {
   return navigator.mediaDevices && navigator.mediaDevices.getUserMedia ? 
-    navigator.mediaDevices.getUserMedia(config) :
+    navigator.mediaDevices.getUserMedia(config).then(delay(1400)) ://extra delay at the start is to avoid the webcam flash
     Promise.reject('no support for getUserMedia');
 };
 
@@ -396,9 +416,24 @@ const requestRecord = (config={video:true, audio:true}) => {
 module.exports = {
   appendToBody,
   createVideo,
+  mrDataToBlobUrl,
   createMediaRecorder,
-  requestRecord
+  requestRecord,
+  recordFromMRForMs,
+  recordInfinite,
+  closeStream,
+  recordClips
 };
+
+//single cycle
+//requestRecord().then(stream => recordFromMRForMs(createMediaRecorder(stream))(6900).then(mrDataToBlobUrl).then(createVideo).then(appendToBody).then(_=>closeStream(stream)))
+
+// document.body.innerHTML = '';
+// requestRecord().then(stream => {
+//   recordClips(300)(stream)
+//     .then(_=>closeStream(stream))
+// });
+
 },{"../../src/Maybe.js":2}],4:[function(require,module,exports){
 Array.empty = _ => [];
 Array.prototype.flatten = function(){return [].concat(...this); };
@@ -430,12 +465,20 @@ function Const(value) {
   if (!(this instanceof Const)) {
     return new Const(value);
   }
-  this.value = value;
+  this.x = value;
 }
 Const.of = x => new Const(x);
 
+Const.prototype.concat = function(y) {
+    return new Const(this.x.concat(y.x));
+};
+
+Const.prototype.ap = function(fa) {
+    return this.concat(fa);
+};
+
 Const.prototype.map = function() {
-  return this;
+  return new Const(this.x);
 };
 
 module.exports = Const;
@@ -446,9 +489,9 @@ module.exports = Const;
   .prototype = function(f, acc) {
     const thisAcc = x => Const(acc);
     Const.prototype.ap = function(b) {
-      return new Const(f(this.value, b.value));
+      return new Const(f(this.x, b.x));
     };
-    return this.map(x => new Const(x)).sequence(thisAcc).value; 
+    return this.map(x => new Const(x)).sequence(thisAcc).x; 
   }
 
 */
@@ -674,7 +717,7 @@ module.exports = {
   Left,
   Right
 };
-},{"../../src/other-types/pointfree.js":17}],8:[function(require,module,exports){
+},{"../../src/other-types/pointfree.js":18}],8:[function(require,module,exports){
 function IO(fn) {
   if (!(this instanceof IO)) {
     return new IO(fn);
@@ -864,7 +907,7 @@ module.exports = Reader;
 //invoke a method on an interface to be passed in later!
 //Reader.of(6).chain(Reader.invoke('increment')).run({increment:x=>x+1})
 //compose(map(x=>x*2), Reader.invoker('transform'), map(x=>x+1), Reader.of)(9).run({transform:x=>x+6})
-},{"../../src/other-types/pointfree.js":17}],12:[function(require,module,exports){
+},{"../../src/other-types/pointfree.js":18}],12:[function(require,module,exports){
 const {curry}  = require('../../src/other-types/pointfree.js');
 
 var Identity = require('./Identity');
@@ -951,7 +994,43 @@ State.prototype.run = function(s) {
 };
 
 module.exports = State;
-},{"../../src/other-types/pointfree.js":17,"./Identity":9,"./Tuple":13,"./utility":18}],13:[function(require,module,exports){
+},{"../../src/other-types/pointfree.js":18,"./Identity":9,"./Tuple":14,"./utility":19}],13:[function(require,module,exports){
+//http://stackoverflow.com/questions/8766246/what-is-the-store-comonad
+//very similar to lenses in some way: it's a getter/setter focused on a particular external context
+const Store = function(set, get){
+  if (!(this instanceof Store)) {
+    return new Store(set, get);
+  }
+  this.set = set;
+  this.get = get;
+};
+
+// gets the value, and also ensures that it's set to whatever it got?
+Store.prototype.extract = function() {
+    return this.set(this.get());
+};
+
+//acts like you're setting the value
+Store.prototype.extend = function(f) {
+    return Store(
+        k => f(Store( this.set, _ => k)),//mind-boggling? alters set to avoid mutating the original value?
+        this.get
+    );
+};
+
+// Derived
+//maps over the eventually extracted value
+Store.prototype.map = function(f) {
+    return this.extend( _ => f(this.get()) );
+};
+
+//sets the value via some function that takes the value as input
+Store.prototype.over = function(f) {
+    return this.set(f(this.get()));
+};
+
+module.exports = Store;
+},{}],14:[function(require,module,exports){
 function Tuple(x, y) {
   if (!(this instanceof Tuple)) {
     return new Tuple(x,y);
@@ -999,7 +1078,7 @@ Tuple.prototype.sequence = function(of){
 }
 
 module.exports = Tuple;
-},{}],14:[function(require,module,exports){
+},{}],15:[function(require,module,exports){
 const {curry, K, I, mconcat, ap}  = require('../../src/other-types/pointfree.js');
 
 function Validation(failure, success){
@@ -1074,7 +1153,7 @@ Success.prototype.concat = function(b) {
 Failure.prototype.concat = function(b) {
   return b.cata({
     Failure: e => Failure(this.e.concat(e)),
-    Success: s => b
+    Success: s => this
   });
 }
 
@@ -1128,6 +1207,7 @@ const aggregateValidationsFailed = (...testList) => testValue => testList.traver
 
 const aggregateValidations = (arrayOfTests) => compose(mconcat, ap(arrayOfTests), Array.of);
 
+//run values over matching lists, then concat all the lists to get the final validation of all values, success/fail list
 
 module.exports = {
   Validation,
@@ -1135,7 +1215,7 @@ module.exports = {
   Success,
   aggregateValidations
 };
-},{"../../src/other-types/pointfree.js":17}],15:[function(require,module,exports){
+},{"../../src/other-types/pointfree.js":18}],16:[function(require,module,exports){
 function Writer(l, v) {
   if (!(this instanceof Writer)) {
     return new Writer(l,v);
@@ -1183,7 +1263,7 @@ Writer.prototype.sequence = function(of){
 }
 
 module.exports = Writer;
-},{}],16:[function(require,module,exports){
+},{}],17:[function(require,module,exports){
 String.prototype.empty = x => '';//makes string a well behaved monoid for left to right cases
 String.empty = String.prototype.empty;
 
@@ -1302,7 +1382,7 @@ module.exports = {
   Endo,
   getResult
 }
-},{}],17:[function(require,module,exports){
+},{}],18:[function(require,module,exports){
 const compose  = (fn, ...rest) =>
   rest.length === 0 ?
     (fn||(x=>x)) :
@@ -1396,7 +1476,7 @@ module.exports = {
   prop,
   bimap
 };
-},{}],18:[function(require,module,exports){
+},{}],19:[function(require,module,exports){
 (function (global){
 const {curry}  = require('../../src/other-types/pointfree.js');
 
@@ -1465,4 +1545,4 @@ module.exports = {
   Compose
 };
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{"../../src/other-types/pointfree.js":17}]},{},[1]);
+},{"../../src/other-types/pointfree.js":18}]},{},[1]);

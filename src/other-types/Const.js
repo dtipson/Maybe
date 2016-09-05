@@ -2,12 +2,20 @@ function Const(value) {
   if (!(this instanceof Const)) {
     return new Const(value);
   }
-  this.value = value;
+  this.x = value;
 }
 Const.of = x => new Const(x);
 
+Const.prototype.concat = function(y) {
+    return new Const(this.x.concat(y.x));
+};
+
+Const.prototype.ap = function(fa) {
+    return this.concat(fa);
+};
+
 Const.prototype.map = function() {
-  return this;
+  return new Const(this.x);
 };
 
 module.exports = Const;
@@ -18,9 +26,9 @@ module.exports = Const;
   .prototype = function(f, acc) {
     const thisAcc = x => Const(acc);
     Const.prototype.ap = function(b) {
-      return new Const(f(this.value, b.value));
+      return new Const(f(this.x, b.x));
     };
-    return this.map(x => new Const(x)).sequence(thisAcc).value; 
+    return this.map(x => new Const(x)).sequence(thisAcc).x; 
   }
 
 */
