@@ -143,10 +143,11 @@ const recordInfinite = duration => stream => {
   return recordFromMRForMs(stream)(duration)
     .then(mrDataToBlobUrl)
     .then(createVideo)
-    .then(appendToBodyThenPrepend)
+    .then(delay(100))
+    .then(appendToBodyThenPrepend(20))
     .then(_ => {
       console.log(_,'complete, starting next')
-      return recordInfinite(stream)
+      return recordInfinite(duration)(stream);
     });
 };
 
@@ -171,7 +172,7 @@ const requestRecord = (config={video:true, audio:true}) => {
 
 // $('button').on('click',function(e){
 //   $('video').get().forEach(function(v){
-//     v.muted = !muted;
+//     v.muted = !v.muted;
 //   });
 //   $(this).toggleClass('unmuted',muted);
 //   muted = !muted;
@@ -195,6 +196,17 @@ module.exports = {
 
 // document.body.innerHTML = '';
 // requestRecord().then(stream => {
-//   recordClips(300)(stream)
+//   recordClips(3000)(stream)
 //     .then(_=>closeStream(stream))
 // });
+
+// document.querySelectorAll('video').forEach(function(v){
+//   v.muted = !v.muted;
+// });
+
+document.querySelectorAll('button')[0].addEventListener('click',function(){
+  document.body.innerHTML = '';
+  requestRecord().then(stream => {
+    recordInfinite(3000)(stream);
+  });
+});

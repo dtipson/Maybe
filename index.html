@@ -13,27 +13,55 @@
 
 <div><input id="email" name="email" type="email"></div>
 <div><input id="password" name="password" type="password"></div>
+<button>Don't Click This</button>
 <script src="bundle.js"></script>
 <script>
+const user = {
+  name:'Bob',
+  features:{
+    eyes: true,
+    head: true,
+    feet: true
+  },
+  relationship: 'Your Uncle',
+  age: 89,
+  items:['bag','boy']
+};
+const L = makeLenses('name','relationship','age','features','eyes','head','feet','items');
 
+const l1 = Leaf(1, "new jersey");
+const l2 = Leaf(2, "ohio");
+const l3 = Leaf(3, "hawaii");
+const l4 = Leaf(4, "utah");
+const l5 = Leaf(5, "the free state of vermont");
+
+const b3 = Branch(l4, l5, "tiny ")
+const b2 = Branch(l2, l3, "minor ");
+const b1 = Branch(l1, b3, "maj ");
+
+
+const tree = Branch(b1, b2, "us ");
+
+  //this is all to play with the "Compose" type, which I don't feel familiar enough with -dt
   const mockFileSystem = {
     hello: "hello Text",
     help: "There is no help"
   };
 
   //simulate it taking time to access the file, with a possible failure
-  const mockFileAccess = filename => Promise.of(mockFileSystem[filename]).then(x=> x?x:Promise.reject(`${filename} not found`));
+  const mockFileAccess = filename => Promise.of(mockFileSystem[filename]).then(x=> x?x:Promise.reject(`${filename} not found`)).then(tapDelay(400));
 
-  const hp = path => contents => Promise.of(`'${contents}' was uploaded to ${path}`)
+
+  const hp = path => contents => Promise.of(`'${contents}' was uploaded to ${path}`).then(tapDelay(400))
   const hpf = path => contents => Promise.reject(`upload of '${contents}' failed`);
 
   //String -> Either(String | Promise)
-  const readFile = compose(map(mockFileAccess), Maybe.fromNullable);
+  const readFile = compose(map(mockFileAccess), Maybe.fromFilter(x=>typeof x === 'string' && x.length>0 ));
 
   const readAndPrintFile = compose(map(map(log)), readFile);
-  const rapFile = compose(x=>x.getCompose, map(log), Compose, readFile);
-  const rauFile = compose(x=>x.getCompose, map(log), map(hp('/uploads')), Compose, readFile);
-  const rauFileFailUpload = compose(x=>x.getCompose, map(log), map(hpf('/uploads')), Compose, readFile);
+  const rapFile = compose(x=>x.decompose, map(log), Compose, readFile);//with Compose
+  const rauFile = compose(x=>x.decompose, map(log), map(hp('/uploads')), map(x=> log(`read file, contents: "${x}"`) && x), Compose, readFile);
+  const rauFileFailUpload = compose(x=>x.decompose, map(log), map(hpf('/uploads')), Compose, readFile);
 
   //run those commands with .map(p=>p.catch(x=>console.log(x))) to catch inner promise rejections
 </script>

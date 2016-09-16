@@ -1,8 +1,14 @@
 (function e(t,n,r){function s(o,u){if(!n[o]){if(!t[o]){var a=typeof require=="function"&&require;if(!u&&a)return a(o,!0);if(i)return i(o,!0);var f=new Error("Cannot find module '"+o+"'");throw f.code="MODULE_NOT_FOUND",f}var l=n[o]={exports:{}};t[o][0].call(l.exports,function(e){var n=t[o][1][e];return s(n?n:e)},l,l.exports,e,t,n,r)}return n[o].exports}var i=typeof require=="function"&&require;for(var o=0;o<r.length;o++)s(r[o]);return s})({1:[function(require,module,exports){
+
+//native prototype enhancements
 require('./src/other-types/Array-helpers.js');
 require('./src/other-types/Promise-helpers.js');
+
+
+const Compose = require('./src/other-types/Compose.js');
 const Const = require('./src/other-types/Const.js');
 const Continuation = require('./src/other-types/Continuation.js');//total nonsense, really
+const Coyoneda = require('./src/other-types/Coyoneda.js');
 const Identity = require('./src/other-types/Identity.js');
 const IO = require('./src/other-types/IO.js');
 const Reader = require('./src/other-types/Reader.js');
@@ -16,13 +22,15 @@ Object.assign(
   require('./src/Maybe.js'),
   require('./src/media-recorder/videobooth.js'),
   require('./src/other-types/Either.js'),
-  {Const, Continuation, Cont:Continuation, Identity, IO, Reader, Tuple, State, Store, Writer},
+  require('./src/other-types/lenses.js'),
+  {Compose, Const, Continuation, Cont:Continuation, Coyoneda, Identity, IO, Reader, Tuple, State, Store, Writer},
   require('./src/other-types/pointfree.js'),
   require('./src/other-types/monoids.js'),
+  require('./src/other-types/Tree.js'),
   require('./src/other-types/Validation.js'),
   require('./src/other-types/utility.js')
 );
-},{"./src/Maybe.js":2,"./src/media-recorder/videobooth.js":3,"./src/other-types/Array-helpers.js":4,"./src/other-types/Const.js":5,"./src/other-types/Continuation.js":6,"./src/other-types/Either.js":7,"./src/other-types/IO.js":8,"./src/other-types/Identity.js":9,"./src/other-types/Promise-helpers.js":10,"./src/other-types/Reader.js":11,"./src/other-types/State.js":12,"./src/other-types/Store.js":13,"./src/other-types/Tuple.js":14,"./src/other-types/Validation.js":15,"./src/other-types/Writer-array.js":16,"./src/other-types/monoids.js":17,"./src/other-types/pointfree.js":18,"./src/other-types/utility.js":19}],2:[function(require,module,exports){
+},{"./src/Maybe.js":2,"./src/media-recorder/videobooth.js":3,"./src/other-types/Array-helpers.js":4,"./src/other-types/Compose.js":5,"./src/other-types/Const.js":6,"./src/other-types/Continuation.js":7,"./src/other-types/Coyoneda.js":8,"./src/other-types/Either.js":9,"./src/other-types/IO.js":10,"./src/other-types/Identity.js":11,"./src/other-types/Promise-helpers.js":12,"./src/other-types/Reader.js":13,"./src/other-types/State.js":14,"./src/other-types/Store.js":15,"./src/other-types/Tree.js":16,"./src/other-types/Tuple.js":17,"./src/other-types/Validation.js":18,"./src/other-types/Writer-array.js":19,"./src/other-types/lenses.js":20,"./src/other-types/monoids.js":21,"./src/other-types/pointfree.js":22,"./src/other-types/utility.js":23}],2:[function(require,module,exports){
 const {curry, compose, head, init, last, tail, prop}  = require('../src/other-types/pointfree.js');
 
 function Maybe(){//create a prototype for Nothing/Just to inherit from
@@ -34,7 +42,7 @@ function Maybe(){//create a prototype for Nothing/Just to inherit from
 const Nothing = (function(){
   const Nothing = function(){};
   Nothing.prototype = Object.create(Maybe.prototype);
-  Nothing.prototype.ap = Nothing.prototype.chain = Nothing.prototype.join = Nothing.prototype.flatten = Nothing.prototype.map = Nothing.prototype.filter = Nothing.prototype.empty = function(){ return this; };
+  Nothing.prototype.ap = Nothing.prototype.chain = Nothing.prototype.join = Nothing.prototype.flatten = Nothing.prototype.map = Nothing.prototype.filter = Nothing.prototype.extend = function(){ return this; };
   Nothing.prototype.sequence = function(of){ return of(this); };//flips Nothing insde a type, i.e.: Type[Nothing]
   Nothing.prototype.traverse = function(fn, of){ return of(this); };//same as above, just ignores the map fn
   Nothing.prototype.reduce = Nothing.prototype.fold = (f, x) => x,//binary function is ignored, the accumulator returned
@@ -45,11 +53,13 @@ const Nothing = (function(){
   Nothing.prototype.toBoolean = _ => false;//reduce a Nothing to false
   //Nothing.prototype[Symbol.toPrimitive] = function(hint){ return hint=='string' ? "" : 0; };//define some behavior for coercion: empty string for string coercion, 0 for number coercion
   Nothing.prototype.toJSON = _ => '{"type":"Maybe.Nothing"}';
-
   return new Nothing();
 })();//result will fail an instanceof Nothing check, because "Nothing" is not the Nothing constructor in the outer scope
 
+
 //now we'll create a Just type with all the same interfaces we defined on Nothing
+
+Maybe.prototype.empty = _ => Nothing;
 
 //here, we eliminate the need to call it with new
 const Just = function(x){
@@ -64,10 +74,10 @@ Just.prototype.map = function(f){ return new Just(f(this.value)); };//transform 
 Just.prototype.ap = function(b){ return b.map(this.value); };//if the inner value is a function, apply a value to it
 Just.prototype.chain = function(f){ return f(this.value); };//transform the inner value, assuming the function returns Just/Nothing
 Just.prototype.sequence = function(of){ return this.value.map(Just); };//flip an inner type with the outer Just
+Just.prototype.extend = function(f){f(this);}
 Just.prototype.traverse = function(fn, of){ return this.map(fn).sequence(of); };//transform the inner value (resulting in an inner type) then flip that type outside
 Just.prototype.toString = function(){ return `Just[${this.value}]`; };
 Just.prototype.reduce = function(f, x) { return f(x, this.value); };//standard binary function, value in Just is the only item
-Just.prototype.empty = _ => Nothing;
 Just.prototype.filter = function(fn){ return this.chain(x=> fn(x)? this : Nothing ); };//test the inner value with a function
 
 //assuming that the inner value has a concat method, concat it with another Just. Falls back to + for strings and numbers
@@ -82,7 +92,10 @@ Just.prototype.toBoolean = _ => true;//reduce a Just to true. Useful in filters
 Just.prototype.toJSON = function(){ return `{"type":"Maybe.Just","value":${JSON.stringify(this.value)}}`; };
 
 const isNull = x => x===null || x===undefined;
-const fromNullable =  x => isNull(x) ? Nothing : Just(x);
+const fromNullable =  x => isNull(x) ? Nothing : Just(x);//includes null/undefined
+const fromFalsy =  x => !x ? Nothing : Just(x);//includes 0 and ""
+//includes empty arrays
+const fromEmpty =  x => !x || (Array.isArray(x) && !x.length) ? Nothing : Just(x);
 
 //we're not strictly defining Just and Nothing as subtypes of Maybe here, but we DO want to have a Maybe interface for more abstract usages
 Object.assign(Maybe, {
@@ -91,6 +104,8 @@ Object.assign(Maybe, {
   toBoolean: m => m!==Nothing,//reduce a passed in Just[any value]/Nothing value to true or false, useful for filters
   isNull,
   fromNullable,
+  fromFalsy,
+  fromEmpty,
   fromFilter: fn => x => fn(x) ? Just(x) : Nothing,
   maybe: curry((nothingVal, justFn, M) => M.reduce( (_,x) => justFn(x), nothingVal )),//no accumulator usage
   head: compose(fromNullable, head),//safehead
@@ -232,7 +247,7 @@ const process = maybe(create, update, maybeRecord);
 
 process(4);
 */
-},{"../src/other-types/pointfree.js":18}],3:[function(require,module,exports){
+},{"../src/other-types/pointfree.js":22}],3:[function(require,module,exports){
 const {Maybe, Nothing, Just} = require('../../src/Maybe.js');
 
 const createVideo = videoURL => {
@@ -378,10 +393,11 @@ const recordInfinite = duration => stream => {
   return recordFromMRForMs(stream)(duration)
     .then(mrDataToBlobUrl)
     .then(createVideo)
-    .then(appendToBodyThenPrepend)
+    .then(delay(100))
+    .then(appendToBodyThenPrepend(20))
     .then(_ => {
       console.log(_,'complete, starting next')
-      return recordInfinite(stream)
+      return recordInfinite(duration)(stream);
     });
 };
 
@@ -406,7 +422,7 @@ const requestRecord = (config={video:true, audio:true}) => {
 
 // $('button').on('click',function(e){
 //   $('video').get().forEach(function(v){
-//     v.muted = !muted;
+//     v.muted = !v.muted;
 //   });
 //   $(this).toggleClass('unmuted',muted);
 //   muted = !muted;
@@ -430,12 +446,24 @@ module.exports = {
 
 // document.body.innerHTML = '';
 // requestRecord().then(stream => {
-//   recordClips(300)(stream)
+//   recordClips(3000)(stream)
 //     .then(_=>closeStream(stream))
 // });
 
+// document.querySelectorAll('video').forEach(function(v){
+//   v.muted = !v.muted;
+// });
+
+document.querySelectorAll('button')[0].addEventListener('click',function(){
+  document.body.innerHTML = '';
+  requestRecord().then(stream => {
+    recordInfinite(3000)(stream);
+  });
+});
+
 },{"../../src/Maybe.js":2}],4:[function(require,module,exports){
 Array.empty = _ => [];
+Array.prototype.empty = Array.empty;
 Array.prototype.flatten = function(){return [].concat(...this); };
 //we need to guard the f against the extra args that native Array.map passes to avoid silly results
 Array.prototype.chain = function(f){
@@ -448,19 +476,84 @@ Array.prototype.sequence = function(point){
     return this.reduceRight(
       function(acc, x) {
         return acc
-          .map(innerarray => promise => [promise].concat(innerarray) )//puts this function in the type
-          .ap(x);//then applies the inner promise value to it
+          .map(innerarray => othertype => [othertype].concat(innerarray) )//puts this function in the type
+          .ap(x);//then applies the inner othertype value to it
       },
       point([])
     );
 };
 
+Array.prototype.extend = function(exfn){
+  return this.map((x,i,arr) => exfn(arr.slice(i)));//passes current item + the rest of the array
+}
+
+Array.prototype.extendNear = function(exfn){
+  const len = this.length;
+  return this.map((x, i ,arr) => {
+    const slice = arr.slice(Math.max(i-1,0),i+2);
+    if(i===0){
+      slice.unshift(arr[len-1]);
+    }else if(i===len){
+      slice.push(arr[0]);
+    }
+    return exfn(slice)
+  });//passes nearby prev/next values
+}
+
+Array.prototype.extract = function(){
+  return this[0];
+}
 
 
 Array.prototype.traverse = function(f, point){
-    return this.map(f).sequence(point);
+    return this.map(f).sequence(point||f);//common enough that it'll be the same to allow that
 };
 },{}],5:[function(require,module,exports){
+//https://drboolean.gitbooks.io/mostly-adequate-guide/content/ch8.html#a-spot-of-theory
+
+const {map, chain}  = require('../../src/other-types/pointfree.js');
+
+//is this a poor-man's FunctorT interface? Yep. TypeT interfaces are more powerful, this works tho
+const Compose = function(f_g_x) {
+  if (!(this instanceof Compose)) {
+    return new Compose(f_g_x);
+  }
+  this.decompose = f_g_x;
+};
+
+Compose.prototype.map = function(f) {
+  return new Compose(map(map(f), this.decompose));
+};
+Compose.prototype.mapChain = function(f) {
+  return new Compose(map(chain(f), this.decompose));
+};
+Compose.dec = C => C.decompose;
+
+module.exports = Compose;
+
+
+/* 
+
+FL version at https://github.com/fantasyland/fantasy-land#traversable
+
+var Compose = function(c) {
+  this.c = c;
+};
+
+Compose.of = function(x) {
+  return new Compose(F.of(G.of(x)));
+};
+
+Compose.prototype.ap = function(x) {
+  return new Compose(this.c.map(u => y => u.ap(y)).ap(x.c));
+};
+
+Compose.prototype.map = function(f) {
+  return new Compose(this.c.map(y => y.map(f)));
+};
+
+*/
+},{"../../src/other-types/pointfree.js":22}],6:[function(require,module,exports){
 function Const(value) {
   if (!(this instanceof Const)) {
     return new Const(value);
@@ -469,6 +562,7 @@ function Const(value) {
 }
 Const.of = x => new Const(x);
 
+//fantasy-const defines this but not entirely sure the logic behind it
 Const.prototype.concat = function(y) {
     return new Const(this.x.concat(y.x));
 };
@@ -478,7 +572,11 @@ Const.prototype.ap = function(fa) {
 };
 
 Const.prototype.map = function() {
-  return new Const(this.x);
+  return this;
+};
+
+Const.prototype.extract = function() {
+  return this.x
 };
 
 module.exports = Const;
@@ -495,7 +593,7 @@ module.exports = Const;
   }
 
 */
-},{}],6:[function(require,module,exports){
+},{}],7:[function(require,module,exports){
 //lots of similarities here to Task, which is a sort of this married to an Either
 //fork and handler are very similar: computation doesn't run until fork is calleds
 
@@ -619,7 +717,43 @@ doCont(
 )(alertMe);
 
 */
-},{}],7:[function(require,module,exports){
+},{}],8:[function(require,module,exports){
+const {I}  = require('../../src/other-types/pointfree.js');
+
+function Coyoneda(x, fn) {
+  if (!(this instanceof Coyoneda)) {
+    return new Coyoneda(x, fn);
+  }
+  Object.assign(this, {x,fn});
+}
+
+Coyoneda.prototype.map = function(f){
+    return Coyoneda(this.x, (...args) => f(this.fn(...args)) );
+};
+
+Coyoneda.prototype.contramap = function(f){
+    return Coyoneda(this.x, compose(this.fn, f));
+};
+
+Coyoneda.prototype.dimap = function(f, g){
+    return Coyoneda(this.x, compose(g, this.fn, f));
+};
+
+//if the value actually has a native map method...
+Coyoneda.prototype.lower = function(){
+    return this.x.map(this.fn);
+};
+
+//if not, but it has an inner value at .x
+Coyoneda.prototype.run = function(){
+    return this.fn(this.x);
+};
+
+Coyoneda.lift = x => Coyoneda(x, I);
+
+module.exports = Coyoneda;
+
+},{"../../src/other-types/pointfree.js":22}],9:[function(require,module,exports){
 const {curry, K, I}  = require('../../src/other-types/pointfree.js');
 
 function Either(...args){
@@ -717,24 +851,41 @@ module.exports = {
   Left,
   Right
 };
-},{"../../src/other-types/pointfree.js":18}],8:[function(require,module,exports){
+},{"../../src/other-types/pointfree.js":22}],10:[function(require,module,exports){
+/*
+const IO = fn =>({
+  runIO: fn,//run the effect
+  map: f => IO( a => f(fn(a)) ),//transform the value
+  chain: f => IO( _ => f(fn()).runIO() ),//transform value into another pure operation
+  fork: _ => IO(x => new Promise(r => window.setTimeout(_ => r(fn(x)), 0) ))//fork the process!
+});
+IO.of = x => IO(_ => x);
+IO.$ = selectors => IO(_=>Array.from(document.querySelectorAll(selectors)));
+
+//IO(_=>document.baseURI).map(x=>x.replace(/\//g,' :P ')).chain(x=>IO(_=>document.body.innerHTML=x))
+
+//const getMouseClickPos = IO(e=>e).map(e=>e.clientX ).chain(x=>IO(_=>document.body.innerHTML=x))
+//x=>IO.of(x).map(e=>e.clientX ).chain().chain(x=>IO(_=>document.body.innerHTML=x)).runIO()
+
+document.addEventListener('click', x=>IO.of(x).map(e=>e.clientX ).chain(x=>IO(_=>document.body.innerHTML=x)).runIO());
+*/
+
+
 function IO(fn) {
   if (!(this instanceof IO)) {
     return new IO(fn);
   }
-  this.runUnsafe = fn;//IO creates an extra control layer above a function
+  this.runIO = fn;//IO creates an extra control layer above a function
 }
 
-
-IO.prototype.of = x => IO(_=>x);//basically the same as IO(K(x))
-IO.of = IO.prototype.of;
+IO.of = IO.prototype.of = x => IO(_=>x);//basically the same as IO(K(x))
 
 IO.prototype.chain = function(f) {
-  return IO(() => f(this.runUnsafe()).runUnsafe() );
+  return IO(_ => f(this.runIO()).runIO() );
 };
 //operations sequenced in next stack?
 IO.prototype.fork = function(f) {
-  return IO(() => window.setTimeout(()=>this.runUnsafe(),0) );
+  return IO(_ => new Promise( r => window.setTimeout(()=>r(this.runIO()),0) ));
 };
 
 IO.prototype.ap = function(a) {
@@ -753,46 +904,59 @@ IO.prototype.sequence = function(of) {
 //String->IO[Array]
 IO.$ = selectorString => new IO(_ => Array.from(document.querySelectorAll(selectorString)));
 
+const getNodeChildren = node => Array.from(node.children);
+
 
 module.exports = IO;
-},{}],9:[function(require,module,exports){
+},{}],11:[function(require,module,exports){
+const {I}  = require('../../src/other-types/pointfree.js');
+
 function Identity(v) {
   if (!(this instanceof Identity)) {
     return new Identity(v);
   }
-  this.value = v;
+  this.x = v;
 }
 
 Identity.prototype.of = x => new Identity(x);
 Identity.of = Identity.prototype.of;
 
 Identity.prototype.map = function(f) {
-  return new Identity(f(this.value));
+  return new Identity(f(this.x));
 };
 Identity.prototype.ap = function(app) {
-  return app.map(this.value);
+  return app.map(this.x);
 };
 Identity.prototype.sequence = function(of){
-  return this.value.map(Identity.of); 
+  return this.x.map(Identity.of); 
 };
-Identity.prototype.chain = function(f) {
-  return f(this.value);
+Identity.prototype.traverse = function(f, of){
+  return this.x.map(f).sequence(of); 
 };
-Identity.prototype.get = function() {
-  return this.value;
+//fold and chain are the same thing for Identitys
+Identity.prototype.chain = Identity.prototype.reduce = Identity.prototype.fold = function(f) {
+  return f(this.x);
 };
 Identity.prototype.equals = function(that){
-  return that instanceof Identity && that.value === this.value;
+  return that instanceof Identity && that.x === this.x;
 };
 
+//comonad
+Identity.prototype.extend = function(f) {
+  return Identity(f(this));//function is given the entire type, returns a regular value, which is put back in the type
+};
+Identity.prototype.flatten = Identity.prototype.extract = function(){
+  return this.x;
+};
+Identity.prototype.duplicate = function(){
+  return this.extend(I)
+};
 
 module.exports = Identity;
-},{}],10:[function(require,module,exports){
-Promise.prototype.of = Promise.resolve;
-Promise.of = x => Promise.resolve(x);
-Promise.prototype.map = Promise.prototype.chain = Promise.prototype.then;
-Promise.prototype.bimap = Promise.prototype.then;
-Promise.prototype.fold = Promise.prototype.then;//is it really? 
+},{"../../src/other-types/pointfree.js":22}],12:[function(require,module,exports){
+Promise.of = Promise.prototype.of = x => Promise.resolve(x);
+Promise.prototype.map = Promise.prototype.chain = Promise.prototype.bimap = Promise.prototype.then;
+//Promise.prototype.fold = Promise.prototype.then;//is it really? 
 //Yes: Promise.reject(9).fold(x=>acc+1, x=>x+1)->P10 Promises hold only one value
 //not sure if tasks turn reject into a resolve like this tho
 
@@ -854,7 +1018,7 @@ Promise.prototype.orElse = function _orElse(f) {
 
 
 
-},{}],11:[function(require,module,exports){
+},{}],13:[function(require,module,exports){
 const {invoke}  = require('../../src/other-types/pointfree.js');
 
 
@@ -876,6 +1040,9 @@ Reader.prototype.ap = function(a) {
 Reader.prototype.map = function(f) {
   return this.chain( a => Reader.of(f(a)) );
 };
+Reader.prototype.contramap = function(f) {
+  return this.chain( a => Reader.of(f(a)) );
+};
 
 Reader.prototype.sequence = function(of){
   //return of(this);//WRONG!!! Reader.of([3,4]).sequence(Array.of) is wrong with this!
@@ -891,13 +1058,16 @@ Reader.of = Reader.prototype.of;
 Reader.ask = Reader(x=>x);
 //it's super tricky when you think about how it works, because you're mapping over the value inside ask to get at it, but because it's just a passthrough func, and it's used inside a chain, you're basically exiting out of the inner value and substituting in the run() value. The layer you're working on is removed and the passthrough is left inside. The inner value only survives if it's passed into that new structure!
 
+//With Reader, you're basically creating a new Reader with a function inside
+
 //silly helpers
-Reader.binary = fn => x => Reader.ask.map(y => fn(y, x));//specify a binary function that will call run's(y) and x
+Reader.binary = fn => x => Reader.ask.map(y => fn(y, x));//specify a binary function that will call run's(y) and x, running the function as if both values were magically summoned and then returning an output
+Reader.binaryC = fn => x => Reader.ask.map(y => fn(y)(x));//specify a CURRIED binary function that will call run's(y) and x, running the function as if both values were magically summoned and then returning an output
 Reader.exec = x => Reader.ask.map(fn => fn(x));//for single functions
 Reader.execer = R => R.chain(x => Reader.ask.map(fn => fn(x)));//for single functions, baking in chain
 Reader.invoke = methodname => x => Reader.ask.map(invoke(methodname)).ap(Reader.of(x));//for interfaces w/ named methods
 Reader.invoker = methodname => R => R.chain(x => Reader.ask.map(invoke(methodname)).ap(Reader.of(x)));//for interfaces w/ named methods, baking in the chain
-Reader.run = x => R => R.run(x);//can be used inline in a composition to resolve a reader layer
+Reader.run = R => R.run;//can be used inline in a composition to expose the run function as the callable interface
 
 module.exports = Reader;
 
@@ -907,7 +1077,47 @@ module.exports = Reader;
 //invoke a method on an interface to be passed in later!
 //Reader.of(6).chain(Reader.invoke('increment')).run({increment:x=>x+1})
 //compose(map(x=>x*2), Reader.invoker('transform'), map(x=>x+1), Reader.of)(9).run({transform:x=>x+6})
-},{"../../src/other-types/pointfree.js":18}],12:[function(require,module,exports){
+
+
+//I think when I first heard that Reader "summons the environment out of thin air" I got a burrito-metaphor-level wrong understanding of it.  When you Reader.of(9).chain(x=>R.ask.map(...)) you could equally well say that you're summoning the "9" out of thin air into a new Reader.  Heck, if you don't actually use x in the ..., it's completely discarded and has no actual effect on the computation from then on.
+
+
+//Reader.of(9).run(9);//-> 9
+//the run value isn't used/has no effect on anything. .of(x) creates the function _ => x, Reader basically works like the Constant Combinator here
+
+//Reader(x=>x+1).run(9);//-> 10, 
+//here Reader explicitly is given and holds a function, so calling run is _exactly_ like just running the fn with the value
+
+//Reader(x=>x+1).map(x=>x*2).run(1);//-> 4 (and NOT 3, as it would be if x=>x*2 came first)
+//mapping over a Reader is just a form of function composition, working left to right
+
+//Reader.of(9).map(x=>x+1).run(500);//-> 10
+//but again, remember that .of(9) creates () => 9, so the run value never makes it through/has any effect: it's discarded. All that's left is the composition of the functions:
+//compose(x=>x+1, ()=>9)(500);//-> 10
+
+//we can do composition on our own though, so what is reader good for? Weaving dependencies into computations:
+
+//Reader.of(1).chain(x=>Reader.ask.map(y=>x+y)).run(2);//-> 3
+
+//What's going on there is pretty wild:
+
+
+//Reader -> _ => 1 ------------v
+//          Reader x=>x . x=>x+1 (where x is going to be the eventual run value)
+
+//So it's taking a Reader with a function that returns a constant value and will always ignore its environment, opening up the Reader's "value" with chain, and swapping it out for a Reader that WILL listen for its environment when run, and pulling the value from the first into the scope of a function run in the second.  Or something.  It's mind-bending.  People have described Reader's ask as "summoning" the outer environment from thin air, but while that's probably how you should end up thinking about it for simplicity/coolness, that's not quite right.  The trick behind it is more about just forcing two Readers together with both of them ripped open at the normally unexposed ends.
+
+//ok, but couldn't we already do this via partial application?  
+//const add = x => y => x+y;
+//add(1)
+
+
+//Sure... but you can't .map() over the value in add(1), can you?  It's already fully baked into the resulting function.  More to the point, you want to be able to write simple functions that don't make big assumptions about a particular environment or resource.  For instance, consider a pesistent db connection. You don't want to create that early or create it every time you need to do something.  You want to be able to pass in a reference to it at the last second: at runtime.  But if the operation itself has lots of different usages and references to it, you need a way to bake in that same reference throughout the composition without using lots of complex closures. In fact, Reader IS the functional version of a closure where, instead of things being just pulled willy-nilly out of an outer scope, it's explicit.  The computation has explicit references (via Reader utilities) reaching out to some eventual runtime environment, and then when the outer context is ready to add in, those connections are linked up.
+
+//
+
+//Reader(x=>x+1).run(9);//-> 10
+},{"../../src/other-types/pointfree.js":22}],14:[function(require,module,exports){
 const {curry}  = require('../../src/other-types/pointfree.js');
 
 var Identity = require('./Identity');
@@ -994,7 +1204,7 @@ State.prototype.run = function(s) {
 };
 
 module.exports = State;
-},{"../../src/other-types/pointfree.js":18,"./Identity":9,"./Tuple":14,"./utility":19}],13:[function(require,module,exports){
+},{"../../src/other-types/pointfree.js":22,"./Identity":11,"./Tuple":17,"./utility":23}],15:[function(require,module,exports){
 //http://stackoverflow.com/questions/8766246/what-is-the-store-comonad
 //very similar to lenses in some way: it's a getter/setter focused on a particular external context
 const Store = function(set, get){
@@ -1010,13 +1220,28 @@ Store.prototype.extract = function() {
     return this.set(this.get());
 };
 
-//acts like you're setting the value
+//alters the setter such that the result of f is what gets extracted
 Store.prototype.extend = function(f) {
     return Store(
         k => f(Store( this.set, _ => k)),//mind-boggling? alters set to avoid mutating the original value?
-        this.get
+        this.get//so extend can never change the getter, I guess?
     );
 };
+
+// Store(x=>t.foo=x,x=>t.foo).extend(st=>5).extract();//-> 5
+
+// Store.prototype.extend2 = function(f) {
+//     var self = this;
+//     return Store(
+//         (k) => {
+//             return f(Store(
+//                 self.set,
+//                 () => k
+//             ));
+//         },
+//         this.get
+//     );
+// };
 
 // Derived
 //maps over the eventually extracted value
@@ -1030,7 +1255,123 @@ Store.prototype.over = function(f) {
 };
 
 module.exports = Store;
-},{}],14:[function(require,module,exports){
+},{}],16:[function(require,module,exports){
+const {Any, Max}  = require('../../src/other-types/monoids.js');
+const {foldMap}  = require('../../src/other-types/pointfree.js');
+
+//straight from
+//http://joneshf.github.io/programming/2015/12/31/Comonads-Monoids-and-Trees.html
+//https://gitter.im/ramda/ramda?at=567c02983acb611716ffac24
+
+function Tree(){}
+
+const Leaf = function(val, ann){
+  if (!(this instanceof Leaf)) {
+    return new Leaf(val, ann);
+  }
+  Object.assign(this, {val, ann});
+}
+Leaf.prototype = Object.create(Tree.prototype);
+Leaf.prototype.toString = function(){
+  return ` Leaf(${this.val}, ${this.ann})`;
+};
+Leaf.prototype.map = function(f){
+  return new Leaf(this.val, f(this.ann));
+};
+Leaf.prototype.extend = function(f){
+  return new Leaf(this.val, f(Leaf(this.val, this.ann)));
+};
+Leaf.prototype.extract = function(){
+  return this.ann;
+};
+Leaf.prototype.reduce = function(f, acc){
+  return f(acc, this.ann);
+};
+Leaf.prototype.concat = function(l){
+  return this.ann.concat(l.ann);
+};
+// Leaf : val -> ann -> Tree val ann
+// function Leaf(val, ann) {
+//   return {
+//     ann: ann,
+//     val: val,
+//     toString: () => ` Leaf(${val}, ${ann})`,
+//     map: f => Leaf(val, f(ann)),
+//     extend: f => Leaf(val, f(Leaf(val, ann))),
+//     extract: _ => val,
+//     reduce: (f, acc) => f(acc, ann),
+//   };
+// }
+
+const Branch = function(left, right, ann){
+  if (!(this instanceof Branch)) {
+    return new Branch(left, right, ann);
+  }
+  Object.assign(this, {left, right, ann});
+}
+Branch.prototype = Object.create(Tree.prototype);
+
+Branch.prototype.toString = function(){
+  return ` Branch(${this.ann}\n  ${this.left},\n  ${this.right}\n )`;
+};
+Branch.prototype.map = function(f){
+  return new Branch(this.left.map(f), this.right.map(f), f(this.ann));
+};
+Branch.prototype.extend = function(f){
+  return new Branch(this.left.extend(f), this.right.extend(f), f(Branch(this.left, this.right, this.ann)));
+};
+Branch.prototype.extract = function(){
+  return this.ann;
+};
+Branch.prototype.reduce = function(f, acc){
+  return this.right.reduce(f, this.left.reduce(f, f(acc, this.ann)));
+};
+Branch.prototype.concat = function(b){
+  return this.ann.concat(b.ann);
+};
+
+Branch.prototype.allAnnotations = function(b){
+  return this.reduce((acc, x) => acc.concat(x), []);
+};
+Branch.prototype.hasChild = function(searchStr){
+  return this.reduce((acc, x) => acc || (x===searchStr && x) || false, false);
+};
+Branch.prototype.findChild = function(searchStr){
+  return this.extend(x=>x.ann);
+};
+
+// Branch : Tree val ann -> Tree val ann -> ann -> Tree val ann
+// function Branch(left, right, ann) {
+//   return {
+//     ann: ann,
+//     left: left,
+//     right: right,
+//     toString: () => ` Branch(${ann}\n  ${left},\n  ${right}\n)`,
+//     map: f => Branch(left.map(f), right.map(f), f(ann)),
+//     extend: f =>
+//       Branch(left.extend(f), right.extend(f), f(Branch(left, right, ann))),
+//     reduce: (f, acc) => right.reduce(f, left.reduce(f, f(acc, ann))),
+//   };
+// }
+
+// changed : Tree val Bool -> Bool
+const changed = tree => foldMap(Any, Any, tree).x;
+
+const largest = tree => foldMap(Max, Max, tree).x;
+
+const longestAnnotation = tree => tree.reduce((acc, x)=> acc.length>x.length? acc :x ,'');
+
+//extend can modify "ann" without altering the underlying data, so that you can run an op on an extended structure as if it were a new tree without altering the old one at all!
+//it's an immutable tree, in short
+
+//this picks the right branch, then extends what the ann should be there by using the context of the entire branch to pick the rightside value.  Then extract returns this "updated" ann at that location.
+//tree.right.extend(tr=>tr.right && tr.right.val).extract()
+
+
+module.exports = {
+  Leaf, Branch, changed, largest, longestAnnotation
+};
+},{"../../src/other-types/monoids.js":21,"../../src/other-types/pointfree.js":22}],17:[function(require,module,exports){
 function Tuple(x, y) {
   if (!(this instanceof Tuple)) {
     return new Tuple(x,y);
@@ -1078,18 +1419,21 @@ Tuple.prototype.sequence = function(of){
 }
 
 module.exports = Tuple;
-},{}],15:[function(require,module,exports){
+},{}],18:[function(require,module,exports){
 const {curry, K, I, mconcat, ap}  = require('../../src/other-types/pointfree.js');
 
-function Validation(failure, success){
-  return success === null ? new Success(right) : new Failure(left);
+function Validation(){
+  throw new Error("Not called directly");
 }
 
 const Failure = function(x){
   if (!(this instanceof Failure)) {
     return new Failure(x);
   }
-  this.e = Array.isArray(x) ? x : [x];//storing the value in the instance
+  if(x==null || !x.concat){
+    throw new Error("Failure values must have a concat method (e.g. Strings, Arrays, etc.)")
+  }
+  this.e = x;//storing the value
 };
 
 Failure.prototype = Object.create(Validation.prototype);
@@ -1098,12 +1442,12 @@ const Success = function(x){
   if (!(this instanceof Success)) {
     return new Success(x);
   }
-  this.s = x;//storing the value in the instance
+  this.s = x;//storing the value
 };
 
 Success.prototype = Object.create(Validation.prototype);
 
-//let's use the cata interface for most of the others
+//let's create a cata interface with which we can define many of the others
 Failure.prototype.cata = function({Failure}){ return Failure(this.e) };
 Success.prototype.cata = function({Success}){ return Success(this.s) };
 
@@ -1146,7 +1490,7 @@ Validation.prototype.getOrElse = function(a) {
 Success.prototype.concat = function(b) {
   return b.cata({
     Failure: e => b,
-    Success: s => this.s
+    Success: s => b.map(bs=>this.s.concat(bs))
   });
 }
 
@@ -1156,6 +1500,19 @@ Failure.prototype.concat = function(b) {
     Success: s => this
   });
 }
+
+//https://github.com/fantasyland/fantasy-validations/blob/master/src/validation.js#L44-L54
+// Validation.prototype.concat = function(b) {
+//     return this.fold(
+//         f => {
+//             return b.bimap(
+//                 g => f.concat(g),
+//                 identity
+//             );
+//         },
+//         s => b.map(d => s.concat(d))
+//     );
+// };
 
 Validation.prototype.getOrElse = function(a) {
   return this.cata({
@@ -1202,10 +1559,16 @@ Validation.fromNullable = Validation.prototype.fromNullable;
 Validation.fromMaybe = Validation.prototype.fromMaybe;
 Validation.fromEither = Validation.prototype.fromEither;
 
-//not quite working
+//nope: need the value to return a success...
+const mconcatv = x => mconcat(x, Validation.of(x));
+
+
+//not quite working, is traverse wrong?
 const aggregateValidationsFailed = (...testList) => testValue => testList.traverse(test=>test(testValue), Validation.of);
 
-const aggregateValidations = (arrayOfTests) => compose(mconcat, ap(arrayOfTests), Array.of);
+const aggregateValidations = (arrayOfTests) => arrayOfTests.length ?
+  compose(mconcat, ap(arrayOfTests), Array.of) ://concat
+  x => Success(x);//empty case is usually a mistake, but it returns the original value at least
 
 //run values over matching lists, then concat all the lists to get the final validation of all values, success/fail list
 
@@ -1215,7 +1578,7 @@ module.exports = {
   Success,
   aggregateValidations
 };
-},{"../../src/other-types/pointfree.js":18}],16:[function(require,module,exports){
+},{"../../src/other-types/pointfree.js":22}],19:[function(require,module,exports){
 function Writer(l, v) {
   if (!(this instanceof Writer)) {
     return new Writer(l,v);
@@ -1263,19 +1626,100 @@ Writer.prototype.sequence = function(of){
 }
 
 module.exports = Writer;
-},{}],17:[function(require,module,exports){
+},{}],20:[function(require,module,exports){
+const { compose, traverse, curry, map, K, I, W}  = require('../../src/other-types/pointfree.js');
+const Identity  = require('../../src/other-types/Identity.js');
+const Const  = require('../../src/other-types/Const.js');
+
+/* Cloning and splicing */
+    //not really good enough for true Immutability, but good enough to play around with without imports/requires/tons of code
+    const cloneShallow = obj => Object.assign({}, obj);
+    const _splice = (index, replacement, xs) => xs.splice(index, 1, replacement) && xs;
+    const _arraySplice = (index, replacement, xs) => _splice(index, replacement, xs.slice(0));
+    const _objectSplice = (key, replacement, obj) => Object.defineProperty(cloneShallow(obj), key, {value:replacement, enumerable:true});
+
+/* Lens Functions */
+    const makeLens = curry(
+      (getter, setter, key, f, xs) => 
+        map(replacement => setter(key, replacement, xs), f(getter(key, xs))) 
+    );
+
+    const arrayLens = curry( (key, f, xs) => map(replacement => _arraySplice(key, replacement, xs), f(xs[key])) );
+    const objectLens = curry( (key, f, xs) => map(replacement => _objectSplice(key, replacement, xs), f(xs[key])) );
+
+/*Lens generators*/
+
+    const lensPath = (...paths) => compose(...paths.map( path => 
+      typeof path ==="string" && Number(path)!=path ? //make sure it's not just a #
+        objectLens(path) : 
+        arrayLens(path) 
+      )
+    );
+    const lensGet = str => lensPath(...str.split('.'));
+
+
+/* Lens methods */
+    const view = curry( (lens, target) => lens(Const)(target).extract() );
+    const over = curry( (lens, fn, target) => lens(y => Identity(fn(y)) )(target).extract() );
+    const set = curry( (lens, val, target) => over(lens, K(val), target) );
+
+/* Lens helpers */
+    const mapped = curry( 
+        (f, x) => Identity( 
+            map( compose( x=>x.extract(), f), x) 
+        ) 
+    );
+
+    //wrong, at least as I've implemented it, works exactly like map, yet doesn't work for Array
+    const traversed = function(f) {
+      return traverse(this.of, f)
+    }
+
+    const makeLenses = (...paths) => paths.reduce( 
+      (acc, key) => W(objectLens(key))(set)(acc),// set(objectLens(key), objectLens(key), acc)//at lens location, set the lens!
+      { num : arrayLens, mapped }
+    );
+
+
+
+
+module.exports ={
+    makeLens,
+    makeLenses,
+    lensPath,
+    lensGet,
+    arrayLens,
+    objectLens,
+    view,
+    over,
+    set
+};
+
+
+    //const jsonIso = dimap(JSON.parse, JSON.stringify);//not an actual iso, as JSON.parse can fail
+
+    //jsonIso( set(lensPath('hi'), 5) )('{"hi":6}');//-> "{hi:5}"
+
+
+
+
+
+
+},{"../../src/other-types/Const.js":6,"../../src/other-types/Identity.js":11,"../../src/other-types/pointfree.js":22}],21:[function(require,module,exports){
+//concatenation is composition with one type (closed composition)
+
 String.prototype.empty = x => '';//makes string a well behaved monoid for left to right cases
 String.empty = String.prototype.empty;
 
-const Endo = function(f){
+const Endo = function(runEndo){
   if (!(this instanceof Endo)) {
-    return new Endo(f);
+    return new Endo(runEndo);
   }
   this.appEndo = runEndo;
 }
 
 Endo.of = x => Endo(x);
-Endo.empty = _ => Endo(x=>x);
+Endo.empty = Endo.prototype.empty = _ => Endo(x=>x);
 
 //concat is just composition
 Endo.prototype.concat = function(y) {
@@ -1316,7 +1760,7 @@ const Disjunction = function(x){
 }
 
 Disjunction.of = x => Disjunction(x);
-Disjunction.empty = () => Disjunction(false);
+Disjunction.empty = Disjunction.prototype.empty = () => Disjunction(false);
 
 Disjunction.prototype.equals = function(y) {
     return this.x === y.x;
@@ -1340,7 +1784,7 @@ const Conjunction = function(x){
 }
 
 Conjunction.of = x => Conjunction(x);
-Conjunction.empty = () => Conjunction(true);
+Conjunction.empty = Conjunction.prototype.empty = () => Conjunction(true);
 
 Conjunction.prototype.equals = function(y) {
     return this.x === y.x;
@@ -1364,11 +1808,30 @@ const Sum = function(x){
 }
 
 Sum.of = x => Sum(x);
-Sum.prototype.empty = () => Sum(0);
+Sum.empty = Sum.prototype.empty = () => Sum(0);
 
 Sum.prototype.concat = function(y) {
     return Sum(this.x + y.x);
 };
+
+const Max = function(x){
+  if (!(this instanceof Max)) {
+    return new Max(x);
+  }
+  this.x = x;
+}
+
+Max.of = x => Max(x);
+Max.empty = Max.prototype.empty = () => Max(0);
+
+Max.prototype.equals = function(y) {
+    return Max(this.x === y.x);
+};
+
+Max.prototype.concat = function(y) {
+    return Max(this.x > y.x ? this.x : y.x);
+};
+
 
 //Max 
 //Min, etc. all require some further constraints, like Ord
@@ -1380,17 +1843,20 @@ module.exports = {
   Any,
   All,
   Endo,
-  getResult
+  getResult,
+  Max
 }
-},{}],18:[function(require,module,exports){
+},{}],22:[function(require,module,exports){
 const compose  = (fn, ...rest) =>
   rest.length === 0 ?
     (fn||(x=>x)) :
     (...args) => fn(compose(...rest)(...args));
+
 const curry = (f, ...args) => (f.length <= args.length) ? f(...args) : (...more) => curry(f, ...args, ...more);
 
 const I = x => x;
 const K = x => y => x;
+const W = x => f => f(x)(x);
 const S = b => f => x => b(x,f(x));
 
 //String -> Object -> Arguments -> ?
@@ -1400,30 +1866,64 @@ const ap = curry((A, A2) => A.ap(A2));
 const map = curry((f, F) => F.map(x=>f(x)));//guard against Array.map
 const reduce = curry((f, acc, F) => F.reduce(f,acc));
 const chain = curry((f, M) => M.chain(f));
-const liftA2 = curry((f, A1, A2) => A1.map(f).ap(A2));
+
+
+
+const liftA2 = curry((f, A1, A2) => A1.map(f).ap(A2));//
 const liftA3 = curry((f, A1, A2, A3) => A1.map(f).ap(A2).ap(A3));
+//look ma, no map!
+//const liftA22 = curry((f, A1, A2) => A1.constructor.of(f).ap(A1).ap(A2));
 
-const concat = curry( (x, y) => x.concat(y));
+    const dimap = curry( (lmap, rmap, fn) => compose(rmap, fn, lmap) );
+    //mutates just the ouput of a function to be named later
+    const lmap = contramap = f => dimap(f, I);
+    //mutates the input of a function to be named later    
+    const rmap = dimap(x=>x);
+    
 
-
-const head = xs => xs[0];
-const tail = xs => xs.slice(1, Infinity);
+const head = xs => xs.head || xs[0];
 const init = xs => xs.slice(0,-1);
-const last = xs => xs.slice(-1)[0];
+const tail = xs => xs.tail || xs.slice(1, Infinity);
+const last = xs => xs.last ? xs.last() : xs.slice(-1)[0];
 const prop = namespace => obj => obj[namespace];
 
-const mconcat = (xs, empty) => xs.length ? xs.reduce(concat) : empty();
+
+//these two include polyfills for arrays
+const extend = fn => W => {
+  return typeof W.extend ==="function" ?
+    W.extend(fn) :
+    W.map((_,i,arr)=>fn(arr.slice(i)))
+};
+const extract = W => {
+  return typeof W.extract ==="function" ? 
+    W.extract() :
+    head(W);
+};
+
+const concat = curry( (x, y) => x.concat(y));
+//inferring empty is not a great idea here...
+const mconcat = (xs, empty) => xs.length||xs.size() ? xs.reduce(concat, empty) : empty ? empty() : xs.empty();
 const bimap = curry((f,g,B)=> B.bimap(f,g)); 
 
-const foldMap = curry(function(f, fldable) {
-  return fldable.reduce(function(acc, x) {
-    const r = f(x);
-    acc = acc || r.empty();
-    return acc.concat(r);
-  }, null);
-});
+// const foldMap = curry(function(f, fldable) {
+//   return fldable.reduce(function(acc, x) {
+//     const r = f(x);
+//     acc = acc || r.empty();
+//     return acc.concat(r);
+//   }, null);
+// });
 
-const fold = foldMap(I);
+//const fold = foldMap(I);
+
+
+
+// foldMap : (Monoid m, Foldable f) => m -> (a -> m) -> f a -> m
+const foldMap = (Monoid, f, Foldable) =>
+  Foldable.reduce((acc, x) => acc.concat(f(x)), Monoid.empty())
+
+// fold : (Monoid m, Foldable f) => m -> f m -> m
+const fold = (Monoid, Foldable) => foldMap(Monoid, I, Foldable);
+
 
 //from http://robotlolita.me/2013/12/08/a-monad-in-practicality-first-class-failures.html
 function curryN(n, f){
@@ -1451,10 +1951,21 @@ const sequence = curry((point, ms) => {
     ms.reduce(perform(point), point([]));
 });
 
+const traverse = curry((point, f, ms)=>{
+  return ms.map(f).sequence(point);
+});
+
+//reducing patterns
+
+const any = (acc, x) => x || acc;//empty is false
+const all = (acc, x) => x && acc;//empty is true
+
+
 module.exports = {
   I,
   K,
   S,
+  W,
   compose,
   composeK,
   curry,
@@ -1468,15 +1979,25 @@ module.exports = {
   liftA2,
   liftA3,
   sequence,
+  traverse,
   invoke,
   head,
   tail,
   init,
   last,
   prop,
-  bimap
+  extend,
+  extract,
+  bimap,
+  fold,
+  foldMap,
+  lmap,
+  rmap,
+  dimap,
+  any,
+  all
 };
-},{}],19:[function(require,module,exports){
+},{}],23:[function(require,module,exports){
 (function (global){
 const {curry}  = require('../../src/other-types/pointfree.js');
 
@@ -1509,6 +2030,10 @@ const doM = gen => {
     }
     return step();
 };
+
+
+
+
 /*
 var result = doM(function*() {
     var value = yield Nothing;
@@ -1516,20 +2041,34 @@ var result = doM(function*() {
     return value + value2;
 }());
 */
+//matches patterns of true/false
+const booleanEquals = arr => arr2 => {
+ return arr.reduce((acc, x, i)=> acc && x===arr2[i], true);
+}
+//http://goo.gl/wwqCtX
+
+  // makes it possible to treat functions as functors
+  // Function.prototype.map = function(f) {
+  //     return x => f(this(x));
+  // }
+
+  // Function.prototype.contramap = function(f) {
+  //     return x => this(f(x));
+  // }
+
+  // Function.prototype.dimap = function(c2d, a2b) {
+  //     return x => c2d( this( a2b(x) ) );//or, compose(c2d,this,a2b)
+  // }
+
+  // Function.prototype.dimap = function(c2d, a2b) {
+  //     return this.contramap(a2b).map(c2d);
+  // }
 
 
-//https://drboolean.gitbooks.io/mostly-adequate-guide/content/ch8.html#a-spot-of-theory
-const Compose = function(f_g_x) {
-  if (!(this instanceof Compose)) {
-    return new Compose(f_g_x);
-  }
-  this.getCompose = f_g_x;
-};
 
-Compose.prototype.map = function(f) {
-  return new Compose(map(map(f), this.getCompose));
-};
-
+//we'll want some helper functions probably, because common DOM methods don't exactly work like Arrays. Nice example:
+const getNodeChildren = node => Array.from(node.children);
+const setHTML = stringHTML => node => IO(_=> Object.assign(node,{innerHTML:stringHTML}));
 
 
 module.exports = {
@@ -1542,7 +2081,9 @@ module.exports = {
   deriveMap,
   deriveAp,
   doM,
-  Compose
+  getNodeChildren,
+  setHTML,
+  booleanEquals
 };
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{"../../src/other-types/pointfree.js":18}]},{},[1]);
+},{"../../src/other-types/pointfree.js":22}]},{},[1]);

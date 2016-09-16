@@ -13,13 +13,28 @@ Store.prototype.extract = function() {
     return this.set(this.get());
 };
 
-//acts like you're setting the value
+//alters the setter such that the result of f is what gets extracted
 Store.prototype.extend = function(f) {
     return Store(
         k => f(Store( this.set, _ => k)),//mind-boggling? alters set to avoid mutating the original value?
-        this.get
+        this.get//so extend can never change the getter, I guess?
     );
 };
+
+// Store(x=>t.foo=x,x=>t.foo).extend(st=>5).extract();//-> 5
+
+// Store.prototype.extend2 = function(f) {
+//     var self = this;
+//     return Store(
+//         (k) => {
+//             return f(Store(
+//                 self.set,
+//                 () => k
+//             ));
+//         },
+//         this.get
+//     );
+// };
 
 // Derived
 //maps over the eventually extracted value

@@ -29,6 +29,10 @@ const doM = gen => {
     }
     return step();
 };
+
+
+
+
 /*
 var result = doM(function*() {
     var value = yield Nothing;
@@ -36,20 +40,34 @@ var result = doM(function*() {
     return value + value2;
 }());
 */
+//matches patterns of true/false
+const booleanEquals = arr => arr2 => {
+ return arr.reduce((acc, x, i)=> acc && x===arr2[i], true);
+}
+//http://goo.gl/wwqCtX
+
+  // makes it possible to treat functions as functors
+  // Function.prototype.map = function(f) {
+  //     return x => f(this(x));
+  // }
+
+  // Function.prototype.contramap = function(f) {
+  //     return x => this(f(x));
+  // }
+
+  // Function.prototype.dimap = function(c2d, a2b) {
+  //     return x => c2d( this( a2b(x) ) );//or, compose(c2d,this,a2b)
+  // }
+
+  // Function.prototype.dimap = function(c2d, a2b) {
+  //     return this.contramap(a2b).map(c2d);
+  // }
 
 
-//https://drboolean.gitbooks.io/mostly-adequate-guide/content/ch8.html#a-spot-of-theory
-const Compose = function(f_g_x) {
-  if (!(this instanceof Compose)) {
-    return new Compose(f_g_x);
-  }
-  this.getCompose = f_g_x;
-};
 
-Compose.prototype.map = function(f) {
-  return new Compose(map(map(f), this.getCompose));
-};
-
+//we'll want some helper functions probably, because common DOM methods don't exactly work like Arrays. Nice example:
+const getNodeChildren = node => Array.from(node.children);
+const setHTML = stringHTML => node => IO(_=> Object.assign(node,{innerHTML:stringHTML}));
 
 
 module.exports = {
@@ -62,5 +80,7 @@ module.exports = {
   deriveMap,
   deriveAp,
   doM,
-  Compose
+  getNodeChildren,
+  setHTML,
+  booleanEquals
 };

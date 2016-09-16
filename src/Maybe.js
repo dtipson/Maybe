@@ -9,7 +9,7 @@ function Maybe(){//create a prototype for Nothing/Just to inherit from
 const Nothing = (function(){
   const Nothing = function(){};
   Nothing.prototype = Object.create(Maybe.prototype);
-  Nothing.prototype.ap = Nothing.prototype.chain = Nothing.prototype.join = Nothing.prototype.flatten = Nothing.prototype.map = Nothing.prototype.filter = Nothing.prototype.empty = function(){ return this; };
+  Nothing.prototype.ap = Nothing.prototype.chain = Nothing.prototype.join = Nothing.prototype.flatten = Nothing.prototype.map = Nothing.prototype.filter = Nothing.prototype.extend = function(){ return this; };
   Nothing.prototype.sequence = function(of){ return of(this); };//flips Nothing insde a type, i.e.: Type[Nothing]
   Nothing.prototype.traverse = function(fn, of){ return of(this); };//same as above, just ignores the map fn
   Nothing.prototype.reduce = Nothing.prototype.fold = (f, x) => x,//binary function is ignored, the accumulator returned
@@ -20,11 +20,13 @@ const Nothing = (function(){
   Nothing.prototype.toBoolean = _ => false;//reduce a Nothing to false
   //Nothing.prototype[Symbol.toPrimitive] = function(hint){ return hint=='string' ? "" : 0; };//define some behavior for coercion: empty string for string coercion, 0 for number coercion
   Nothing.prototype.toJSON = _ => '{"type":"Maybe.Nothing"}';
-
   return new Nothing();
 })();//result will fail an instanceof Nothing check, because "Nothing" is not the Nothing constructor in the outer scope
 
+
 //now we'll create a Just type with all the same interfaces we defined on Nothing
+
+Maybe.prototype.empty = _ => Nothing;
 
 //here, we eliminate the need to call it with new
 const Just = function(x){
@@ -39,10 +41,10 @@ Just.prototype.map = function(f){ return new Just(f(this.value)); };//transform 
 Just.prototype.ap = function(b){ return b.map(this.value); };//if the inner value is a function, apply a value to it
 Just.prototype.chain = function(f){ return f(this.value); };//transform the inner value, assuming the function returns Just/Nothing
 Just.prototype.sequence = function(of){ return this.value.map(Just); };//flip an inner type with the outer Just
+Just.prototype.extend = function(f){f(this);}
 Just.prototype.traverse = function(fn, of){ return this.map(fn).sequence(of); };//transform the inner value (resulting in an inner type) then flip that type outside
 Just.prototype.toString = function(){ return `Just[${this.value}]`; };
 Just.prototype.reduce = function(f, x) { return f(x, this.value); };//standard binary function, value in Just is the only item
-Just.prototype.empty = _ => Nothing;
 Just.prototype.filter = function(fn){ return this.chain(x=> fn(x)? this : Nothing ); };//test the inner value with a function
 
 //assuming that the inner value has a concat method, concat it with another Just. Falls back to + for strings and numbers
@@ -57,7 +59,10 @@ Just.prototype.toBoolean = _ => true;//reduce a Just to true. Useful in filters
 Just.prototype.toJSON = function(){ return `{"type":"Maybe.Just","value":${JSON.stringify(this.value)}}`; };
 
 const isNull = x => x===null || x===undefined;
-const fromNullable =  x => isNull(x) ? Nothing : Just(x);
+const fromNullable =  x => isNull(x) ? Nothing : Just(x);//includes null/undefined
+const fromFalsy =  x => !x ? Nothing : Just(x);//includes 0 and ""
+//includes empty arrays
+const fromEmpty =  x => !x || (Array.isArray(x) && !x.length) ? Nothing : Just(x);
 
 //we're not strictly defining Just and Nothing as subtypes of Maybe here, but we DO want to have a Maybe interface for more abstract usages
 Object.assign(Maybe, {
@@ -66,6 +71,8 @@ Object.assign(Maybe, {
   toBoolean: m => m!==Nothing,//reduce a passed in Just[any value]/Nothing value to true or false, useful for filters
   isNull,
   fromNullable,
+  fromFalsy,
+  fromEmpty,
   fromFilter: fn => x => fn(x) ? Just(x) : Nothing,
   maybe: curry((nothingVal, justFn, M) => M.reduce( (_,x) => justFn(x), nothingVal )),//no accumulator usage
   head: compose(fromNullable, head),//safehead

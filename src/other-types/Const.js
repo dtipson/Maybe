@@ -6,6 +6,7 @@ function Const(value) {
 }
 Const.of = x => new Const(x);
 
+//fantasy-const defines this but not entirely sure the logic behind it
 Const.prototype.concat = function(y) {
     return new Const(this.x.concat(y.x));
 };
@@ -15,7 +16,11 @@ Const.prototype.ap = function(fa) {
 };
 
 Const.prototype.map = function() {
-  return new Const(this.x);
+  return this;
+};
+
+Const.prototype.extract = function() {
+  return this.x
 };
 
 module.exports = Const;

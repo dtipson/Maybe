@@ -1,14 +1,17 @@
 const {curry, K, I, mconcat, ap}  = require('../../src/other-types/pointfree.js');
 
-function Validation(failure, success){
-  return success === null ? new Success(right) : new Failure(left);
+function Validation(){
+  throw new Error("Not called directly");
 }
 
 const Failure = function(x){
   if (!(this instanceof Failure)) {
     return new Failure(x);
   }
-  this.e = Array.isArray(x) ? x : [x];//storing the value in the instance
+  if(x==null || !x.concat){
+    throw new Error("Failure values must have a concat method (e.g. Strings, Arrays, etc.)")
+  }
+  this.e = x;//storing the value
 };
 
 Failure.prototype = Object.create(Validation.prototype);
@@ -17,12 +20,12 @@ const Success = function(x){
   if (!(this instanceof Success)) {
     return new Success(x);
   }
-  this.s = x;//storing the value in the instance
+  this.s = x;//storing the value
 };
 
 Success.prototype = Object.create(Validation.prototype);
 
-//let's use the cata interface for most of the others
+//let's create a cata interface with which we can define many of the others
 Failure.prototype.cata = function({Failure}){ return Failure(this.e) };
 Success.prototype.cata = function({Success}){ return Success(this.s) };
 
@@ -65,7 +68,7 @@ Validation.prototype.getOrElse = function(a) {
 Success.prototype.concat = function(b) {
   return b.cata({
     Failure: e => b,
-    Success: s => this.s
+    Success: s => b.map(bs=>this.s.concat(bs))
   });
 }
 
@@ -75,6 +78,19 @@ Failure.prototype.concat = function(b) {
     Success: s => this
   });
 }
+
+//https://github.com/fantasyland/fantasy-validations/blob/master/src/validation.js#L44-L54
+// Validation.prototype.concat = function(b) {
+//     return this.fold(
+//         f => {
+//             return b.bimap(
+//                 g => f.concat(g),
+//                 identity
+//             );
+//         },
+//         s => b.map(d => s.concat(d))
+//     );
+// };
 
 Validation.prototype.getOrElse = function(a) {
   return this.cata({
@@ -121,10 +137,16 @@ Validation.fromNullable = Validation.prototype.fromNullable;
 Validation.fromMaybe = Validation.prototype.fromMaybe;
 Validation.fromEither = Validation.prototype.fromEither;
 
-//not quite working
+//nope: need the value to return a success...
+const mconcatv = x => mconcat(x, Validation.of(x));
+
+
+//not quite working, is traverse wrong?
 const aggregateValidationsFailed = (...testList) => testValue => testList.traverse(test=>test(testValue), Validation.of);
 
-const aggregateValidations = (arrayOfTests) => compose(mconcat, ap(arrayOfTests), Array.of);
+const aggregateValidations = (arrayOfTests) => arrayOfTests.length ?
+  compose(mconcat, ap(arrayOfTests), Array.of) ://concat
+  x => Success(x);//empty case is usually a mistake, but it returns the original value at least
 
 //run values over matching lists, then concat all the lists to get the final validation of all values, success/fail list
 

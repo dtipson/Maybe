@@ -1,8 +1,6 @@
-Promise.prototype.of = Promise.resolve;
-Promise.of = x => Promise.resolve(x);
-Promise.prototype.map = Promise.prototype.chain = Promise.prototype.then;
-Promise.prototype.bimap = Promise.prototype.then;
-Promise.prototype.fold = Promise.prototype.then;//is it really? 
+Promise.of = Promise.prototype.of = x => Promise.resolve(x);
+Promise.prototype.map = Promise.prototype.chain = Promise.prototype.bimap = Promise.prototype.then;
+//Promise.prototype.fold = Promise.prototype.then;//is it really? 
 //Yes: Promise.reject(9).fold(x=>acc+1, x=>x+1)->P10 Promises hold only one value
 //not sure if tasks turn reject into a resolve like this tho
 

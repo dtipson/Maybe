@@ -1,15 +1,17 @@
+//concatenation is composition with one type (closed composition)
+
 String.prototype.empty = x => '';//makes string a well behaved monoid for left to right cases
 String.empty = String.prototype.empty;
 
-const Endo = function(f){
+const Endo = function(runEndo){
   if (!(this instanceof Endo)) {
-    return new Endo(f);
+    return new Endo(runEndo);
   }
   this.appEndo = runEndo;
 }
 
 Endo.of = x => Endo(x);
-Endo.empty = _ => Endo(x=>x);
+Endo.empty = Endo.prototype.empty = _ => Endo(x=>x);
 
 //concat is just composition
 Endo.prototype.concat = function(y) {
@@ -50,7 +52,7 @@ const Disjunction = function(x){
 }
 
 Disjunction.of = x => Disjunction(x);
-Disjunction.empty = () => Disjunction(false);
+Disjunction.empty = Disjunction.prototype.empty = () => Disjunction(false);
 
 Disjunction.prototype.equals = function(y) {
     return this.x === y.x;
@@ -74,7 +76,7 @@ const Conjunction = function(x){
 }
 
 Conjunction.of = x => Conjunction(x);
-Conjunction.empty = () => Conjunction(true);
+Conjunction.empty = Conjunction.prototype.empty = () => Conjunction(true);
 
 Conjunction.prototype.equals = function(y) {
     return this.x === y.x;
@@ -98,11 +100,30 @@ const Sum = function(x){
 }
 
 Sum.of = x => Sum(x);
-Sum.prototype.empty = () => Sum(0);
+Sum.empty = Sum.prototype.empty = () => Sum(0);
 
 Sum.prototype.concat = function(y) {
     return Sum(this.x + y.x);
 };
+
+const Max = function(x){
+  if (!(this instanceof Max)) {
+    return new Max(x);
+  }
+  this.x = x;
+}
+
+Max.of = x => Max(x);
+Max.empty = Max.prototype.empty = () => Max(0);
+
+Max.prototype.equals = function(y) {
+    return Max(this.x === y.x);
+};
+
+Max.prototype.concat = function(y) {
+    return Max(this.x > y.x ? this.x : y.x);
+};
+
 
 //Max 
 //Min, etc. all require some further constraints, like Ord
@@ -114,5 +135,6 @@ module.exports = {
   Any,
   All,
   Endo,
-  getResult
+  getResult,
+  Max
 }
