@@ -1,0 +1,1 @@
+Reader Type married to the Either Type

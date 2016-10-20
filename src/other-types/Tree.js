@@ -72,6 +72,20 @@ Branch.prototype.concat = function(b){
   return this.ann.concat(b.ann);
 };
 
+Leaf.prototype._traverse = function(f, acc){
+  return this.value;
+};
+Branch.prototype._traverse = function *(b){
+  if(this.left) yield * this.left._traverse();
+  yield this.value;
+  if(this.right) yield * this.right._traverse();
+};
+Branch.prototype[Symbol.iterator] = function(){
+  return this._traverse();
+}
+
+
+
 Branch.prototype.allAnnotations = function(b){
   return this.reduce((acc, x) => acc.concat(x), []);
 };

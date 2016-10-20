@@ -41,7 +41,7 @@ const Const  = require('../../src/other-types/Const.js');
         ) 
     );
 
-    //wrong, at least as I've implemented it, works exactly like map, yet doesn't work for Array
+    //wrong, at least as I've implemented it, works exactly like map, yet doesn't work for Array!
     const traversed = function(f) {
       return traverse(this.of, f)
     }

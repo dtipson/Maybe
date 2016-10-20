@@ -13,8 +13,14 @@ Identity.of = Identity.prototype.of;
 Identity.prototype.map = function(f) {
   return new Identity(f(this.x));
 };
+Identity.prototype.fold = function(f) {
+  return f(x);
+};
 Identity.prototype.ap = function(app) {
   return app.map(this.x);
+};
+Identity.prototype.ap2 = function(b) {
+  return new Identity(b.x(this.x));
 };
 Identity.prototype.sequence = function(of){
   return this.x.map(Identity.of); 
@@ -22,6 +28,7 @@ Identity.prototype.sequence = function(of){
 Identity.prototype.traverse = function(f, of){
   return this.x.map(f).sequence(of); 
 };
+
 //fold and chain are the same thing for Identitys
 Identity.prototype.chain = Identity.prototype.reduce = Identity.prototype.fold = function(f) {
   return f(this.x);
@@ -40,5 +47,18 @@ Identity.prototype.flatten = Identity.prototype.extract = function(){
 Identity.prototype.duplicate = function(){
   return this.extend(I)
 };
+
+//chainRec
+Identity.prototype.chainRec = function(f, i) {
+    let state = { done: false, value: i};
+    const next = v => ({ done: false, value: v });
+    const done = v => ({ done: true, value: v });
+    while (state.done === false) {
+      state = f(next, done, state.value).extract();
+    }
+    return Identity.of(state.value);
+};
+Identity.chainRec = Identity.prototype.chainRec;
+//Identity.chainRec((next, done, x) => x === 0 ? Identity.of(done(x)) : Identity.of(next(x - 1)), 5)
 
 module.exports = Identity;

@@ -44,3 +44,48 @@ Array.prototype.extract = function(){
 Array.prototype.traverse = function(f, point){
     return this.map(f).sequence(point||f);//common enough that it'll be the same to allow that
 };
+
+
+
+
+
+// implementation of Array.chainRec
+const stepNext = x => ({value: x, done: false });
+const stepDone = x => ({value: x, done: true });
+
+Array.chainRec = function _chainRec(f, i) {
+  var todo = [i];
+  var res = [];
+  var buffer, xs, idx;
+  while (todo.length > 0) {
+    xs = f(stepNext, stepDone, todo.shift());
+    buffer = [];
+    for (idx = 0; idx < xs.length; idx += 1) {
+      (xs[idx].done ? res : buffer).push(xs[idx].value);
+    }
+    Array.prototype.unshift.apply(todo, buffer);
+  }
+  return res;
+};
+
+
+//now begins silliness
+
+//int range
+Array.range = (limit, start=0) => Array.chainRec(function(next, done, x) {
+  if(start>limit){
+    throw new Error('you are dumb');//this should be externalized so that it only runs once
+  }
+  return (x === limit) ? [done(x)] : [done(x), next(x+1)]
+}, start);
+
+Array.weirdUnfold = (start, step, limit) => Array.chainRec(function(next, done, x) {
+  return (limit(x)) ? [done(x)] : [done(x), next(step(x))]
+}, start);
+
+
+/*
+Array.chainRec(function(next, done, x) {
+  return (x == 10) ? [done(x)] : [done(x), next(x+1)]
+}, 0) // [ 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 ]
+*/

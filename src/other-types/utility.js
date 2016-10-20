@@ -30,7 +30,8 @@ const doM = gen => {
     return step();
 };
 
-
+const add = curry((x,y) => x+y);
+const increment = add(1);
 
 
 /*
@@ -46,31 +47,21 @@ const booleanEquals = arr => arr2 => {
 }
 //http://goo.gl/wwqCtX
 
-  // makes it possible to treat functions as functors
-  // Function.prototype.map = function(f) {
-  //     return x => f(this(x));
-  // }
-
-  // Function.prototype.contramap = function(f) {
-  //     return x => this(f(x));
-  // }
-
-  // Function.prototype.dimap = function(c2d, a2b) {
-  //     return x => c2d( this( a2b(x) ) );//or, compose(c2d,this,a2b)
-  // }
-
-  // Function.prototype.dimap = function(c2d, a2b) {
-  //     return this.contramap(a2b).map(c2d);
-  // }
-
-
-
 //we'll want some helper functions probably, because common DOM methods don't exactly work like Arrays. Nice example:
 const getNodeChildren = node => Array.from(node.children);
 const setHTML = stringHTML => node => IO(_=> Object.assign(node,{innerHTML:stringHTML}));
+const setStyleProp = (propString, newValue) => node => IO(_ => { node.style[propString] = newValue; return node;});
+
+//IO.$('input').map(compose(Maybe.fromNullable,head)).chain(compose( sequence(IO.of), map(setStyleProp('color','red')) )).runIO();
+
+//compose(chain(traverse(setStyleProp('color','red'), IO.of)), map(Maybe.head), IO.$)
+//Reader.ask.map(IO.$).map(map(Maybe.head)).map(chain(traverse(setStyleProp('color','red'), IO.of))).map(x=>x.runIO()).run
+//document.addEventListener('click', compose(runIO, chain(setStyleProp('color','red')), IO.of, e=>e.target))
 
 
 module.exports = {
+  add,
+  increment,
   delay,
   delayR,
   tapDelay,
@@ -82,5 +73,6 @@ module.exports = {
   doM,
   getNodeChildren,
   setHTML,
+  setStyleProp,
   booleanEquals
 };

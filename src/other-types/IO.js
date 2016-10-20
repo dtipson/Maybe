@@ -43,12 +43,15 @@ IO.prototype.map = function(f) {
 };
 
 //?unproven/maybe not possible?
-IO.prototype.sequence = function(of) {
-  return of(this.map());
-};
+// IO.prototype.sequence = function(of) {
+//   return of(IO.of).ap(of(this.runIO()));
+// };
 
 //String->IO[Array]
 IO.$ = selectorString => new IO(_ => Array.from(document.querySelectorAll(selectorString)));
+
+IO.$id = idString => new IO(_ => document.getElementById(idString));
+IO.setStyle = (style, to) => node => new IO(_ => { node.style[style] = to; return node;}  );
 
 const getNodeChildren = node => Array.from(node.children);
 

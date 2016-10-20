@@ -1,8 +1,10 @@
-const {curry, compose, head, init, last, tail, prop}  = require('../src/other-types/pointfree.js');
+const {curry, compose, head, init, last, tail, prop} = require('../src/other-types/pointfree.js');
 
 function Maybe(){//create a prototype for Nothing/Just to inherit from
     throw new TypeError('Maybe is not called directly');
 }
+
+
 
 //We only ever need one "Nothing" so we'll define the type, create the one instance, and return it. We could have just created an object with 
 //all these methods on it, but then it wouldn't log as nicely/clearly
@@ -13,7 +15,8 @@ const Nothing = (function(){
   Nothing.prototype.sequence = function(of){ return of(this); };//flips Nothing insde a type, i.e.: Type[Nothing]
   Nothing.prototype.traverse = function(fn, of){ return of(this); };//same as above, just ignores the map fn
   Nothing.prototype.reduce = Nothing.prototype.fold = (f, x) => x,//binary function is ignored, the accumulator returned
-  Nothing.prototype.getOrElse = Nothing.prototype.orElse = Nothing.prototype.concat = x => x;//just returns the provided value
+  Nothing.prototype.getOrElse = Nothing.prototype.concat = x => x;//just returns the provided value
+  Nothing.prototype.orElse = x => Just(x);
   Nothing.prototype.cata = ({Nothing}) => Nothing();  //not the Nothing type constructor here, btw, a prop named "Nothing" defining a nullary function!
   Nothing.prototype.equals = function(y){return y==this;};//setoid
   Nothing.prototype.toString = _ => 'Nothing';
@@ -73,6 +76,7 @@ Object.assign(Maybe, {
   fromNullable,
   fromFalsy,
   fromEmpty,
+  lift: fn => x => Just(fn(x)),
   fromFilter: fn => x => fn(x) ? Just(x) : Nothing,
   maybe: curry((nothingVal, justFn, M) => M.reduce( (_,x) => justFn(x), nothingVal )),//no accumulator usage
   head: compose(fromNullable, head),//safehead

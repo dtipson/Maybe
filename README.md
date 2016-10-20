@@ -122,4 +122,14 @@ aggregateValidations([
   x => x===3 ? Success(3) : Failure(['still not 3']),
   x => x===3 ? Success(3) : Failure(['and again, not a 3'])
 ])(3);//-> Success[3]
+
+
+Reader.of(IO(_=>window.innerWidth))
+  .chain(io => Reader.ask.map(mx => io.map(ww=> mx < ww/2).runIO()))
+  .run(870)
+
+document.onclick = event => Reader.of(IO(_=>window.innerWidth))
+  .chain(io => Reader.ask.map(mx => io.map(ww=> mx < ww/2).runIO()))
+  .run(event.pageX)
+
 ```

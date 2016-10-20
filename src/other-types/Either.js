@@ -74,7 +74,15 @@ Either.prototype.bimap = function(f, g) {
   );
 };
 
-
+Either.try = f => (...args) => {
+  try{
+    return Right(f(...args));
+  }
+  catch(e){
+    return Left(e);
+  }
+};
+Either.fromNullable = x => !x == null ? Right(x) : Left();
 Either.fromFilter = fn => x => fn(x) ? Right(x) : Left(x);
 Either.of = x => new Right(x);
 Either.either = curry((leftFn, rightFn, E) => {

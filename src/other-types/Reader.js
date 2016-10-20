@@ -37,7 +37,7 @@ Reader.of = Reader.prototype.of;
 Reader.ask = Reader(x=>x);
 //it's super tricky when you think about how it works, because you're mapping over the value inside ask to get at it, but because it's just a passthrough func, and it's used inside a chain, you're basically exiting out of the inner value and substituting in the run() value. The layer you're working on is removed and the passthrough is left inside. The inner value only survives if it's passed into that new structure!
 
-//With Reader, you're basically creating a new Reader with a function inside
+//With Reader.ask, you're basically creating a fresh Reader with a function inside that passes through the new end value: you have to map over it to combine it with the previous value
 
 //silly helpers
 Reader.binary = fn => x => Reader.ask.map(y => fn(y, x));//specify a binary function that will call run's(y) and x, running the function as if both values were magically summoned and then returning an output

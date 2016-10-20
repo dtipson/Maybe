@@ -1,5 +1,6 @@
 //http://stackoverflow.com/questions/8766246/what-is-the-store-comonad
 //very similar to lenses in some way: it's a getter/setter focused on a particular external context
+//lenses are, in fact, coalgebras of the store/costate monad
 const Store = function(set, get){
   if (!(this instanceof Store)) {
     return new Store(set, get);
