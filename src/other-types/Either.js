@@ -1,4 +1,4 @@
-const {curry, K, I}  = require('../../src/other-types/pointfree.js');
+const {curry, compose, K, I}  = require('../../src/other-types/pointfree.js');
 
 function Either(...args){
   switch (args.length) {
@@ -35,6 +35,20 @@ Right.prototype = Object.create(Either.prototype);
 Left.prototype.cata = function({Left}){ return Left(this.l) };
 Right.prototype.cata = function({Right}){ return Right(this.r) };
 
+Right.prototype.concat = function(e) {
+  return e.cata({
+    Left: l => e,
+    Right: r => Right(this.r.concat(r))
+  });
+};
+
+Left.prototype.concat = function(e) {
+  return e.cata({
+    Left: l => Left(this.l.concat(l)),
+    Right: r => this
+  });
+};
+
 ///???
 Either.prototype.fold = Either.prototype.reduce = function(f, g) {
   return this.cata({
@@ -42,6 +56,8 @@ Either.prototype.fold = Either.prototype.reduce = function(f, g) {
     Right: g
   });
 };
+
+
 
 Either.prototype.chain = function(f) {
   return this.fold(K(this), f);
@@ -82,21 +98,47 @@ Either.try = f => (...args) => {
     return Left(e);
   }
 };
-Either.fromNullable = x => !x == null ? Right(x) : Left();
-Either.fromFilter = fn => x => fn(x) ? Right(x) : Left(x);
+
+
+Either.fromNullable = x => (x != null) ? Right(x) : Left();
+
+
+Either.fromPredicate = curry(
+  (fn, x) => fn(x) ? Right(x) : Left(x)
+);
 Either.of = x => new Right(x);
 Either.either = curry((leftFn, rightFn, E) => {
-  console.log()
-  if(E instanceof Left){
-    return leftFn(E.l);
-  }
-  else if(E instanceof Right){
-    return rightFn(E.r);
-  }else{
+  if(!(E instanceof Either)){
     throw new TypeError('invalid type given to Either.either');
   }
+  return E.cata({
+    Right: r => rightFn(r),
+    Left: l => leftFn(l)
+  })
 });
 
+
+const isArrayString = x=>/\[\d\]/.test(x);
+
+const objOrArray = pathComponent => 
+  Either.fromPredicate(isArrayString, pathComponent)
+    .fold(I,x=>x.replace(/\[\]/g))
+
+//users.0.name
+const getPath = (paths, obj) => 
+  paths.reduce(
+    (eobj, pathC) => eobj.chain(o=>Either.fromNullable(o[pathC])), 
+    Either.of(obj)
+  ).fold(x=>undefined, I)
+
+const splitPath = arg => 
+  Either.fromPredicate(x=>typeof x === "string", arg)
+    .fold(I, x=>x.split('.'));
+
+
+Either.get = curry(
+  (pathOrPathString, obj) => getPath(splitPath(pathOrPathString), obj)
+)
 
 module.exports = {
   Either,

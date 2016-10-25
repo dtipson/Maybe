@@ -1,4 +1,7 @@
+//...and semigroups...
 //concatenation is composition with one type (closed composition)
+const {Left, Right}  = require('../../src/other-types/Either.js');
+
 
 String.prototype.empty = x => '';//makes string a well behaved monoid for left to right cases
 String.empty = String.prototype.empty;
@@ -106,6 +109,66 @@ Sum.prototype.concat = function(y) {
     return Sum(this.x + y.x);
 };
 
+// Sum = x => ({
+//   x,
+//   concat: ({x:y}) => Sum(x+y)
+// })
+
+
+const First = function(x){
+  if (!(this instanceof First)) {
+    return new First(x);
+  }
+  this.x = x;
+}
+
+First.of = x => First(x);
+
+First.prototype.concat = function(y) {
+    return this;
+};
+//but this has no possible empty interface
+
+
+//not anywhere near right, but a possible way to make any semigroup work as a monoid
+const Firsty = function(x){
+  if (!(this instanceof Firsty)) {
+    return new Firsty(x);
+  }
+  this.x = Right(x);
+}
+
+Firsty.of = x => Firsty(x);
+
+//not correct, but sort of on that track 
+Firsty.prototype.concat = function(y) {
+  return this.x.fold()
+};
+//and now we can define this
+Firsty.empty = _ => Left(null);
+
+
+//List.of(1,2,4).foldMap(Sum, Sum.empty())
+
+
+
+const Last = function(x){
+  if (!(this instanceof Last)) {
+    return new Last(x);
+  }
+  this.x = x;
+}
+
+Last.of = x => Last(x);
+
+Last.prototype.concat = function(y) {
+    return y;
+};
+
+
+
+
+
 const Max = function(x){
   if (!(this instanceof Max)) {
     return new Max(x);
@@ -125,9 +188,44 @@ Max.prototype.concat = function(y) {
 };
 
 
-//Max 
-//Min, etc. all require some further constraints, like Ord
+const Min = function(x){
+  if (!(this instanceof Min)) {
+    return new Min(x);
+  }
+  this.x = x;
+}
 
+Min.of = x => Min(x);
+Min.empty = Min.prototype.empty = () => Min(Infinity);
+
+Min.prototype.equals = function(y) {
+    return Min(this.x === y.x);
+};
+
+Min.prototype.concat = function(y) {
+    return Min(this.x < y.x ? this.x : y.x);
+};
+
+
+//Max 
+//Min, etc. all really require some further constraints, like Ord
+
+/*
+const rec1 =  Map({
+  username: First('drew'),
+  money: Sum(10),
+  lastLogin: Max(34223334523) 
+});
+
+const rec2 = Map({
+  username: First('drew'),
+  money: Sum(10),
+  lastLogin: Max(34234523) 
+})
+
+now we can teach entire objects how to combine because all their values are captured in types that know how they work
+
+*/
 const getResult = M => M.getResult ? M.getResult() : M.x;
 
 module.exports = {
@@ -136,5 +234,9 @@ module.exports = {
   All,
   Endo,
   getResult,
-  Max
+  Max,
+  Min,
+  First,
+  Last,
+  Firsty
 }

@@ -25,10 +25,11 @@ Object.assign(
   require('./src/media-recorder/videobooth.js'),
   require('./src/other-types/Either.js'),
   require('./src/other-types/lenses.js'),
-  {Compose, Const, Continuation, Cont:Continuation, Task, Coyoneda, Identity, IO, Reader, Tuple, State, Store, Writer},
+  {Compose, Const, Continuation, Cont:Continuation, Task, Coyoneda, Identity, Box: Identity, IO, Reader, Tuple, State, Store, Writer},
   require('./src/other-types/pointfree.js'),
   require('./src/other-types/monoids.js'),
   require('./src/other-types/Tree.js'),
   require('./src/other-types/Validation.js'),
+  require('./src/other-types/natural-transformations.js'),
   require('./src/other-types/utility.js')
 );

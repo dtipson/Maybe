@@ -1,22 +1,3 @@
-/*
-const IO = fn =>({
-  runIO: fn,//run the effect
-  map: f => IO( a => f(fn(a)) ),//transform the value
-  chain: f => IO( _ => f(fn()).runIO() ),//transform value into another pure operation
-  fork: _ => IO(x => new Promise(r => window.setTimeout(_ => r(fn(x)), 0) ))//fork the process!
-});
-IO.of = x => IO(_ => x);
-IO.$ = selectors => IO(_=>Array.from(document.querySelectorAll(selectors)));
-
-//IO(_=>document.baseURI).map(x=>x.replace(/\//g,' :P ')).chain(x=>IO(_=>document.body.innerHTML=x))
-
-//const getMouseClickPos = IO(e=>e).map(e=>e.clientX ).chain(x=>IO(_=>document.body.innerHTML=x))
-//x=>IO.of(x).map(e=>e.clientX ).chain().chain(x=>IO(_=>document.body.innerHTML=x)).runIO()
-
-document.addEventListener('click', x=>IO.of(x).map(e=>e.clientX ).chain(x=>IO(_=>document.body.innerHTML=x)).runIO());
-*/
-
-
 function IO(fn) {
   if (!(this instanceof IO)) {
     return new IO(fn);

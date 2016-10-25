@@ -11,7 +11,9 @@ const W = curry((x,f) => f(x)(x));//duplication
 const S = curry((f, g, x) => f(x)(g(x)));//substitution
 const S2 = f => g => x => f(x, g(x));//substitution, but for non-curried
 
-const binaryRight = x => _ => s => s(x);//Task.of is defined this way!
+const binaryLeft = curry((x, l, _) => l(x));
+const binaryRight = curry((x, _, r) => r(x));
+
 
 //String -> Object -> Arguments -> ?
 const invoke = curry(
@@ -35,6 +37,45 @@ const dimap = curry( (lmap, rmap, fn) => compose(rmap, fn, lmap) );
 const lmap = contramap = f => dimap(f, I);
 //mutates the input of a function to be named later    
 const rmap = dimap(x=>x);
+
+const iso = dimap;
+
+iso.mapISO = iso(x=>[...x], xs=>new Map(xs));
+
+
+//https://github.com/DrBoolean/immutable-ext
+Map.prototype.concat = function(otherMap){
+  const newMap = [];
+  for (let [key, value] of this) {
+    let otherValue = otherMap.get(key); 
+    if(!value.concat || !otherValue.concat){
+      throw new Error('values must be semigroups');
+    }
+    newMap.push([key,value.concat(otherValue)])
+  }
+  return new Map(newMap);
+}
+
+Map.prototype.annotate = function(typeMap){
+  const newMap = [];
+  for (let [key, value] of this) {
+    let typeConstructor = typeMap.get(key); 
+    newMap.push([key,typeConstructor(value)])
+  }
+  return new Map(newMap);
+}
+
+Map.prototype.concatTypes = function(otherMap, typeMap){
+  const newMap = [];
+  for (let [key, value] of this) {
+    const typeConstructor = typeMap.get(key); 
+    const otherValue = typeConstructor(otherMap.get(key)); 
+    newMap.push([key,typeConstructor(value).concat(otherValue)])
+  }
+  return new Map(newMap);
+}
+
+
 
 
 const head = xs => xs.head || xs[0];
@@ -78,6 +119,14 @@ const foldMap = curry(
   (Monoid, f, Foldable) => Foldable.reduce((acc, x) => acc.concat(f(x)), Monoid.empty())
 );
 
+const foldAs = curry(
+  (Monoid, Foldable) => foldMap(Monoid, Monoid, Foldable).x
+); 
+
+var fold3 = curry(
+  (lfn, rfn, foldable) => foldable.fold(lfn,rfn)
+);
+
 // fold : (Monoid m, Foldable f) => m -> f m -> m
 const fold = curry(
   (Monoid, Foldable) => foldMap(Monoid, I, Foldable)
@@ -93,7 +142,9 @@ var foldMap2 = curry(function(f, fldable) {
 });
 
 // fold : (Binary Reducing fn, Target Type g, foldable)
-var fold2 = curry(function(rfn, g, fldable) { return fldable.fold(rfn, g) })
+var fold2 = curry(
+  (rfn, g, fldable) => fldable.fold(rfn, g)
+);
 
 
 
@@ -139,6 +190,9 @@ const apply  = f => arr => f(...arr)
 const unapply = f => (...args) => f(args);
 
 
+
+
+
 module.exports = {
   I,
   K,
@@ -172,12 +226,15 @@ module.exports = {
   extract,
   bimap,
   fold,
+  foldAs,
   foldMap,
   lmap,
   rmap,
+  iso,
   dimap,
-  iso: dimap,
   any,
   all,
-  runIO
+  runIO,
+  binaryLeft,
+  binaryRight
 };

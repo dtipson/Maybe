@@ -52,8 +52,6 @@ const Const  = require('../../src/other-types/Const.js');
     );
 
 
-
-
 module.exports ={
     makeLens,
     makeLenses,

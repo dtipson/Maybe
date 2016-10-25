@@ -16,8 +16,11 @@ Identity.prototype.map = function(f) {
 Identity.prototype.fold = function(f) {
   return f(x);
 };
-Identity.prototype.ap = function(app) {
-  return app.map(this.x);
+Identity.prototype.ap = function(ap2) {
+  return ap2.map(this.x);
+};
+Identity.prototype.flap = function(ap2) {
+  return new Identity(ap2.x(this.x));
 };
 Identity.prototype.ap2 = function(b) {
   return new Identity(b.x(this.x));
@@ -26,7 +29,7 @@ Identity.prototype.sequence = function(of){
   return this.x.map(Identity.of); 
 };
 Identity.prototype.traverse = function(f, of){
-  return this.x.map(f).sequence(of); 
+  return this.map(f).sequence(of); 
 };
 
 //fold and chain are the same thing for Identitys
