@@ -15,6 +15,9 @@ Reader.prototype.chain = function(f) {
 Reader.prototype.ap = function(a) {
   return this.chain( f => a.map(f) );
 };
+Reader.prototype.flap = function(a) {
+  return a.chain( f => this.map(f) );
+};
 
 Reader.prototype.map = function(f) {
   return this.chain( a => Reader.of(f(a)) );
@@ -23,9 +26,12 @@ Reader.prototype.contramap = function(f) {
   return this.chain( a => Reader.of(f(a)) );
 };
 
+//no, and probably not actually possible or desirable: Reader wants to be externalized
+Reader.prototype.traverse = function(of, f){
+  return Reader.of(x=>of(this)).ap(this).run()
+}
 Reader.prototype.sequence = function(of){
-  //return of(this);//WRONG!!! Reader.of([3,4]).sequence(Array.of) is wrong with this!
-  return this.run().map(Reader.of);
+  return this.traverse(of, x=>x);
 }
 
 Reader.prototype.of = function(a) {

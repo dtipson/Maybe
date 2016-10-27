@@ -230,6 +230,8 @@ const getResult = M => M.getResult ? M.getResult() : M.x;
 
 module.exports = {
   Sum,
+  Additive: Sum,
+  Disjunction: Any,
   Any,
   All,
   Endo,

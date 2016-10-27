@@ -17,6 +17,7 @@ const Store = require('./src/other-types/Store.js');
 const Tuple = require('./src/other-types/Tuple.js');
 const Task = require('./src/other-types/Task.js');
 const Writer = require('./src/other-types/Writer-array.js');
+const { List, Map } = require('immutable-ext');
 
 Object.assign(
   window,
@@ -25,7 +26,7 @@ Object.assign(
   require('./src/media-recorder/videobooth.js'),
   require('./src/other-types/Either.js'),
   require('./src/other-types/lenses.js'),
-  {Compose, Const, Continuation, Cont:Continuation, Task, Coyoneda, Identity, Box: Identity, IO, Reader, Tuple, State, Store, Writer},
+  {Compose, Const, Continuation, Cont:Continuation, List, Task, Coyoneda, Id: Identity, Identity, Box: Identity, IO, Map, Reader, Tuple, State, Store, Writer},
   require('./src/other-types/pointfree.js'),
   require('./src/other-types/monoids.js'),
   require('./src/other-types/Tree.js'),

@@ -19,6 +19,10 @@ const binaryRight = curry((x, _, r) => r(x));
 const invoke = curry(
   (methodname, obj) => (...args) => obj[methodname](...args)
 );
+const andCall = curry(
+  (methodname, obj) => obj[methodname](...args)
+);
+
 
 const ap = curry((A, A2) => A.ap(A2));
 const map = curry((f, F) => F.map(x=>f(x)));//guard against Array.map
@@ -175,7 +179,7 @@ const sequence = curry((point, ms) => {
     ms.reduce(perform(point), point([]));
 });
 
-const traverse = curry( (f, point, Functor) => Functor.map(f).sequence(point) );
+const traverse = curry( (f, point, Traversable) => Traversable.map(f).sequence(point) );
 
 const runIO = IO => IO.runIO();
 

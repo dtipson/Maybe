@@ -94,19 +94,24 @@ Task.prototype.ap = function _ap(that) {
   });
 };
 
+/*adapters*/
+
+const taskify = promiseapi => (...args) => new Task((rej,res)=>promiseapi(...args).then(res).catch(rej));
 
 
-const fetchTask = (resource, config={}) => new Task(function(reject, resolve){
-  fetch(resource, config).then(x=>resolve(x)).catch(e=>reject(e));//don't return anything, cancelTokens don't exist yet
-});
+
+const fetchTask = taskify(fetch);
 
 
-// const fetchTask = (resource, config={}) => new Task(function(reject, resolve){
-//   const cancelToken = const { token, cancel } = CancelToken.source();
-//   fetch(resource, Object.assign(config, {cancelToken:token})).then(x=>resolve(x)).catch(e=>reject(e)); 
-//   return cancel;
+// const fetchBatch = (resource, config={}) => new Task(function(reject, resolve){
+//   fetch().then(x=>resolve(x)).catch(e=>reject(e));
 // });
 
 Task.fetch = fetchTask;
+Task.taskify = taskify;
+
+//x=>x.json() -> Task.to('json')
+Task.to = method => resource => 
+  new Task((rej,res) => resource[method]().then(res,rej))
 
 module.exports = Task;

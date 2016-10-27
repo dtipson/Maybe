@@ -23,11 +23,23 @@ const user = {
     head: true,
     feet: true
   },
+  posts:[{title:'foobar'},{'title':'barfoo'}],
   relationship: 'Your Uncle',
   age: 89,
   items:['bag','boy']
 };
-const L = makeLenses('name','relationship','age','features','eyes','head','feet','items');
+
+const users =[
+{
+  name:'bob',
+  posts:[{title:'foobar'},{'title':'barfoo'}]
+},
+ {
+  name:'jill',
+  posts:[{title:'foobar'},{'title':'barfoo'}]
+} 
+]
+const L = makeLenses('name','relationship','age','features','eyes','head','feet','items','posts','title');
 
 const l1 = Leaf(1, "new jersey");
 const l2 = Leaf(2, "ohio");

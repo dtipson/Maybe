@@ -4,8 +4,6 @@ function Maybe(){//create a prototype for Nothing/Just to inherit from
     throw new TypeError('Maybe is not called directly');
 }
 
-
-
 //We only ever need one "Nothing" so we'll define the type, create the one instance, and return it. We could have just created an object with 
 //all these methods on it, but then it wouldn't log as nicely/clearly
 const Nothing = (function(){
@@ -14,7 +12,8 @@ const Nothing = (function(){
   Nothing.prototype.ap = Nothing.prototype.chain = Nothing.prototype.join = Nothing.prototype.flatten = Nothing.prototype.map = Nothing.prototype.filter = Nothing.prototype.extend = function(){ return this; };
   Nothing.prototype.sequence = function(of){ return of(this); };//flips Nothing insde a type, i.e.: Type[Nothing]
   Nothing.prototype.traverse = function(fn, of){ return of(this); };//same as above, just ignores the map fn
-  Nothing.prototype.reduce = Nothing.prototype.fold = (f, x) => x,//binary function is ignored, the accumulator returned
+  Nothing.prototype.reduce = (f, x) => x,//binary function is ignored, the accumulator returned
+  Nothing.prototype.fold = (g, f) => typeof g === "function" ? g() : g;
   Nothing.prototype.getOrElse = Nothing.prototype.concat = x => x;//just returns the provided value
   Nothing.prototype.orElse = x => Just(x);
   Nothing.prototype.cata = ({Nothing}) => Nothing();  //not the Nothing type constructor here, btw, a prop named "Nothing" defining a nullary function!
@@ -48,6 +47,9 @@ Just.prototype.extend = function(f){f(this);}
 Just.prototype.traverse = function(fn, of){ return this.map(fn).sequence(of); };//transform the inner value (resulting in an inner type) then flip that type outside
 Just.prototype.toString = function(){ return `Just[${this.value}]`; };
 Just.prototype.reduce = function(f, x) { return f(x, this.value); };//standard binary function, value in Just is the only item
+Just.prototype.fold = function(_, f) { return f(this.value); };
+
+
 Just.prototype.filter = function(fn){ return this.chain(x=> fn(x)? this : Nothing ); };//test the inner value with a function
 
 //assuming that the inner value has a concat method, concat it with another Just. Falls back to + for strings and numbers
@@ -70,6 +72,8 @@ const fromEmpty =  x => !x || (Array.isArray(x) && !x.length) ? Nothing : Just(x
 //we're not strictly defining Just and Nothing as subtypes of Maybe here, but we DO want to have a Maybe interface for more abstract usages
 Object.assign(Maybe, {
   of: x => new Just(x),//pointed interface to create the type (Just(9)/Maybe.of are synonymous )
+  Nothing: _ => Nothing,
+  Just: x=> new Just(x),
   empty: Nothing.empty,//calling empty returns a Nothing
   toBoolean: m => m!==Nothing,//reduce a passed in Just[any value]/Nothing value to true or false, useful for filters
   isNull,

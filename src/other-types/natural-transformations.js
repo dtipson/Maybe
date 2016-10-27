@@ -1,18 +1,20 @@
 const Task  = require('../../src/other-types/Task.js');
-const Either  = require('../../src/other-types/Either.js');
-const IO  = require('../../src/other-types/IO.js');
 
 //natural transformation
+const idToTask = i => i.fold(Task.of);
 const eitherToTask = e => e.fold(Task.rejected,Task.of);
 const ioToTask = i => new Task((rej, res) => res(i.runIO()));
-const readerToTask = r => new Task((rej,res)=>res(r.run()))
+const readerToTask = r => new Task((rej,res)=>res(r.run()));
 
 /*
 Db.find Task of an Either(user|null)
 //ways of dealing with nested types: MonadTransformers/natural transformations
 
+Db.find => Task(Either)
+
+
 Db.find(1)
-  .chain(eitherToTask)
+  .chain(eitherToTask)//-> now everything is a task, though either branch is lost
   .chain(u=>Db.find(u.best_friend_id))
   .chain(eitherToTask)
   .fork(error => send(500,{error}), u=>send(200,u));
@@ -22,7 +24,7 @@ Db.find(1)
 //natural transformation: order of this shouldn't matter
 (map(f), nt) == (nt, map(f))
 
-//alternative 
+//alternative, using traverse to keep types, and both branches
 
 Db.find(1)
   .chain(eu=>
@@ -43,6 +45,8 @@ Db.find(1)
 */
 
 module.exports = {
+  idToTask,
   eitherToTask,
-  ioToTask
+  ioToTask,
+  readerToTask
 }

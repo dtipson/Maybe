@@ -43,14 +43,13 @@ const Const  = require('../../src/other-types/Const.js');
 
     //wrong, at least as I've implemented it, works exactly like map, yet doesn't work for Array!
     const traversed = function(f) {
-      return traverse(this.of, f)
+      return traverse(f, this.of)
     }
 
     const makeLenses = (...paths) => paths.reduce( 
       (acc, key) => W(objectLens(key))(set)(acc),// set(objectLens(key), objectLens(key), acc)//at lens location, set the lens!
-      { num : arrayLens, mapped }
+      { num : arrayLens, mapped, traversed }
     );
-
 
 module.exports ={
     makeLens,
