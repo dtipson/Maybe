@@ -1,6 +1,6 @@
-//lots of similarities here to Task, which is a sort of this married to an Either
-//fork and handler are very similar: computation doesn't run until fork is calleds
-
+//lots of similarities here to Task and Reader
+//fork and handler are very similar: computation doesn't run until fork is called
+//https://gist.github.com/tel/9a34caf0b6e38cba6772
 function Continuation(fork) {
   if (!(this instanceof Continuation)) {
     return new Continuation(fork);
@@ -34,6 +34,8 @@ Continuation.fill = value => Continuation.ask.map(resume => resume(value)).fork(
 Continuation.prototype.fork = function(resume) {
   return this.fork(resume);
 };
+
+Continuation.prototype.run = Continuation.prototype.fork;
 
 Continuation.prototype.escape = function() {
   return this.fork(x=>x);

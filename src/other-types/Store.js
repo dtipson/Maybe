@@ -9,7 +9,7 @@ const Store = function(set, get){
   this.get = get;
 };
 
-// gets the value, and also ensures that it's set to whatever it got?
+// gets the value, and also ensures that it sets to whatever it got? Seems to extecute the action
 Store.prototype.extract = function() {
     return this.set(this.get());
 };

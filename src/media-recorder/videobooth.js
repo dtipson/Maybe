@@ -204,7 +204,7 @@ module.exports = {
 //   v.muted = !v.muted;
 // });
 
-document.querySelectorAll('button')[0].addEventListener('click',function(){
+document.querySelectorAll('button')[1].addEventListener('click',function(){
   document.body.innerHTML = '';
   requestRecord().then(stream => {
     recordInfinite(3000)(stream);

@@ -8,6 +8,10 @@ function Reader(run) {
   this.run = run;
 }
 
+Reader.prototype.toString = function(a) {
+  return `a => ${this.run}(a)`;
+};
+
 Reader.prototype.chain = function(f) {
   return new Reader( r => f(this.run(r)).run(r) );
 };
@@ -26,7 +30,7 @@ Reader.prototype.contramap = function(f) {
   return this.chain( a => Reader.of(f(a)) );
 };
 
-//no, and probably not actually possible or desirable: Reader wants to be externalized
+//no, and probably not actually possible or desirable: Reader wants to be externalized, not swapped inside anything
 Reader.prototype.traverse = function(of, f){
   return Reader.of(x=>of(this)).ap(this).run()
 }
@@ -49,10 +53,43 @@ Reader.ask = Reader(x=>x);
 Reader.binary = fn => x => Reader.ask.map(y => fn(y, x));//specify a binary function that will call run's(y) and x, running the function as if both values were magically summoned and then returning an output
 Reader.binaryC = fn => x => Reader.ask.map(y => fn(y)(x));//specify a CURRIED binary function that will call run's(y) and x, running the function as if both values were magically summoned and then returning an output
 Reader.exec = x => Reader.ask.map(fn => fn(x));//for single functions
-Reader.execer = R => R.chain(x => Reader.ask.map(fn => fn(x)));//for single functions, baking in chain
+Reader.execer = R => R.chain(Reader.exec);//for single functions, baking in chain
 Reader.invoke = methodname => x => Reader.ask.map(invoke(methodname)).ap(Reader.of(x));//for interfaces w/ named methods
 Reader.invoker = methodname => R => R.chain(x => Reader.ask.map(invoke(methodname)).ap(Reader.of(x)));//for interfaces w/ named methods, baking in the chain
 Reader.run = R => R.run;//can be used inline in a composition to expose the run function as the callable interface
+
+
+Reader.ReaderT = M => {
+    function ReaderT(run) {
+      if (!(this instanceof ReaderT)) {
+        return new ReaderT(run);
+      }
+      this.run = run;
+    }
+
+    ReaderT.lift = m => ReaderT(constant(m));
+
+    ReaderT.of = a => ReaderT(e => M.of(a));
+
+    ReaderT.ask = ReaderT(e => M.of(e));
+
+    ReaderT.prototype.chain = function(f) {
+        return ReaderT(e => this.run(e).chain(a => f(a).run(e)));
+    };
+
+    ReaderT.prototype.map = function(f) {
+      return this.chain(a => ReaderT.of( f(a) ) );
+    };
+
+    ReaderT.prototype.ap = function(a) {
+      return ReaderT(e => this.run(e).ap(a.run(e)));
+    };
+
+    return ReaderT;
+};
+
+
+
 
 module.exports = Reader;
 

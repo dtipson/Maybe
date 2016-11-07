@@ -1,4 +1,5 @@
 const {curry, compose, head, init, last, tail, prop} = require('../src/other-types/pointfree.js');
+const Task  = require('../src/other-types/Task.js');
 
 function Maybe(){//create a prototype for Nothing/Just to inherit from
     throw new TypeError('Maybe is not called directly');
@@ -83,10 +84,26 @@ Object.assign(Maybe, {
   lift: fn => x => Just(fn(x)),
   fromFilter: fn => x => fn(x) ? Just(x) : Nothing,
   maybe: curry((nothingVal, justFn, M) => M.reduce( (_,x) => justFn(x), nothingVal )),//no accumulator usage
-  head: compose(fromNullable, head),//safehead
+  head: compose(fromNullable, head),//safehead, which is a natural transformation!
   last: compose(fromNullable, last),//safelast
   prop: namespace => compose(fromNullable, prop(namespace))//safeprop
 });
+
+//additional FL method
+Maybe.prototype.alt = function(b) {
+  return this.cata({
+    Just: _ => this,
+    Nothing: () => b,
+  });
+};
+Maybe.zero = Maybe.prototype.zero = _ => Nothing;
+Maybe.prototype.toTask = function(rejmsg) {
+  return this.cata({
+    Just: x => Task.of(x),
+    Nothing: () => Task.rejected(rejmsg),
+  });
+};
+
 
 const maybe = Maybe.maybe;//pretty important pattern, yo
 

@@ -2,9 +2,47 @@ const Task  = require('../../src/other-types/Task.js');
 
 //natural transformation
 const idToTask = i => i.fold(Task.of);
-const eitherToTask = e => e.fold(Task.rejected,Task.of);
+const maybeToTaskWMsg = msg => m => m.reduce((acc,x)=>Task.of(x), Task.rejected(msg));
+const maybeToTask = maybeToTaskWMsg(null);
+const maybeToIO = m => m.reduce((acc,x)=>IO.of(x), IO.of(undefined));
+const maybeToEither = m => m.reduce((acc,x)=>Either.of(x), Left(null));
+const eitherToTask = e => e.fold(Task.rejected, Task.of);
 const ioToTask = i => new Task((rej, res) => res(i.runIO()));
 const readerToTask = r => new Task((rej,res)=>res(r.run()));
+//const eitherToIO = e => e.fold(x=>IO.of(undefined),x=>IO.of(x))
+const idToArray = id => [id.fold(I)];
+
+//safeHead/Maybe.head IS a natural transformation! Array -> Maybe
+//so is Map({hi:true}).toArray()
+//reverse?
+const maybeToArray = m => m.cata({Just:x=>[x],Nothing:_=>[]});// or, m.reduce((acc,x)=>acc.concat(x),[]);
+const readerToMaybe = r => fromNullable(r.run());//I don't think so... https://bartoszmilewski.com/2015/04/07/natural-transformations/
+
+/*
+[[1,5,6],['a','b','c']].chain(Maybe.head).sequence(Maybe.of)
+t1(t2).chain(nt t2->t3).sequence(t3.of)
+
+.chain(f).sequence(of) = ???
+
+other examples of this pattern?
+
+Just(Just(9)).map(maybeToEither).sequence()
+
+
+
+
+Task.of('#email')
+  .map(IO.$)
+  .chain(ioToTask)
+  .map(Maybe.head)
+  .chain(maybeToTask)
+  .map(IO.setAttr('value','dtipsonsyasdasdasd@gmail.com'))
+  .chain(ioToTask)
+  .fork(e=>console.log(e), I);
+
+
+
+*/
 
 /*
 Db.find Task of an Either(user|null)
@@ -48,5 +86,12 @@ module.exports = {
   idToTask,
   eitherToTask,
   ioToTask,
-  readerToTask
+  readerToTask,
+  idToArray,
+  maybeToArray,
+  readerToMaybe,
+  maybeToTask,
+  maybeToTaskWMsg,
+  maybeToEither,
+  maybeToIO
 }

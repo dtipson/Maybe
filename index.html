@@ -10,10 +10,14 @@
 </head><body>
 
 
-
-<div><input id="email" name="email" type="email"></div>
+<form>
+<label>Email<input id="email" class="email" name="email" type="email" title="Email Address"></label>
 <div><input id="password" name="password" type="password"></div>
-<button>Don't Click This</button>
+<div><input id="first" name="firstname" type="text" title="binary name" pattern="\d" required></div>
+<button>Submit v</button>
+<button formnovalidate>Submit</button>
+</form>
+<button id="videob">Don't Click This</button>
 <script src="bundle.js"></script>
 <script>
 const user = {
@@ -54,7 +58,37 @@ const b1 = Branch(l1, b3, "maj ");
 
 const tree = Branch(b1, b2, "us ");
 
-  //this is all to play with the "Compose" type, which I don't feel familiar enough with -dt
+
+
+const fakeDb = id =>
+  ({id: id, name: 'user1', best_friend_id: id - 1})
+
+const Db = ({
+  find: id =>
+    new Task((rej, res) =>
+      setTimeout(() =>{
+        id < 20 ? 
+          res(id > 2 ? Right(fakeDb(id)) : Left('user not found')) :
+          rej('could not fetch')
+      },
+      100))
+})
+
+const send = (code, json) =>
+  console.log(`pretend sending ${code}: ${JSON.stringify(json)}`)
+
+const findWho = whoId => Db.find(whoId)
+.chain(eu =>
+  eu.fold(e => Task.of(eu),
+          u => Db.find(u.best_friend_id)));
+
+const findWho2 = whoId => Db.find(whoId)
+  .chain(eitherToTask)
+  .chain(u => Db.find(u.best_friend_id).map(x=>x.map(bf=>[u,bf])));
+
+/*
+  //this is all to play with the Compose type, which I don't feel familiar enough with -dt 
+*/
   const mockFileSystem = {
     hello: "hello Text",
     help: "There is no help"
@@ -70,7 +104,7 @@ const tree = Branch(b1, b2, "us ");
   //String -> Either(String | Promise)
   const readFile = compose(map(mockFileAccess), Maybe.fromFilter(x=>typeof x === 'string' && x.length>0 ));
 
-  const readAndPrintFile = compose(map(map(log)), readFile);
+  const readAndPrintFile = compose(map(map(log)), readFile);//with a double map
   const rapFile = compose(x=>x.decompose, map(log), Compose, readFile);//with Compose
   const rauFile = compose(x=>x.decompose, map(log), map(hp('/uploads')), map(x=> log(`read file, contents: "${x}"`) && x), Compose, readFile);
   const rauFileFailUpload = compose(x=>x.decompose, map(log), map(hpf('/uploads')), Compose, readFile);

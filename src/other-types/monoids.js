@@ -130,7 +130,7 @@ First.prototype.concat = function(y) {
 //but this has no possible empty interface
 
 
-//not anywhere near right, but a possible way to make any semigroup work as a monoid
+//not anywhere near right, but there IS a possible way to make any semigroup work as a monoid, sort of by elevating it up a level
 const Firsty = function(x){
   if (!(this instanceof Firsty)) {
     return new Firsty(x);

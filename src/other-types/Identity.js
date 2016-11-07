@@ -9,7 +9,9 @@ function Identity(v) {
 
 Identity.prototype.of = x => new Identity(x);
 Identity.of = Identity.prototype.of;
-
+Identity.prototype.toString = function() {
+  return `Identity[${this.x}]`
+};
 Identity.prototype.map = function(f) {
   return new Identity(f(this.x));
 };
@@ -25,16 +27,33 @@ Identity.prototype.flap = function(ap2) {
 Identity.prototype.ap2 = function(b) {
   return new Identity(b.x(this.x));
 };
+
+
 Identity.prototype.sequence = function(of){
-  return this.x.map(Identity.of); 
+  return this.x.map(Identity.of);//we use sequence when an inner type exists that has a map method, so returning it with ITS value wrapped in Id is sufficient
 };
 Identity.prototype.traverse = function(f, of){
-  return this.map(f).sequence(of); 
+  return this.map(f).sequence(of);//transform, then sequence
 };
 
-//fold and chain are the same thing for Identitys
-Identity.prototype.chain = Identity.prototype.reduce = Identity.prototype.fold = function(f) {
+//same result, different derivation
+Identity.prototype.traverse2 = function(f, of){
+  return f(this.x).map(Identity);
+};
+Identity.prototype.sequence2 = function(of){
+  return this.traverse(I);
+};
+
+
+
+
+//fold and chain are the same thing for Identity!
+Identity.prototype.chain = 
+Identity.prototype.fold = function(f) {
   return f(this.x);
+};
+Identity.prototype.reduce = function(f, acc) {
+  return f(acc, this.x);
 };
 Identity.prototype.equals = function(that){
   return that instanceof Identity && that.x === this.x;

@@ -1,6 +1,19 @@
 
+
+const logFn = fn => {
+  if(fn.name){
+    return fn.name
+  }else{
+    let stringFn = fn.toString().replace(/\s\s+/g, ' ');
+    return stringFn.length>25 ?
+      `(${stringFn.replace(/(=>)(.*)/, "$1 ...")})` :
+      `(${stringFn})`
+  }
+};
+
+
 // fn => Task fn
-const Task = function(computation){
+const Task = function(computation, annotation){
   if (!(this instanceof Task)) {
     return new Task(computation);
   }
@@ -8,16 +21,29 @@ const Task = function(computation){
     const result = computation(eh,sh);
     return typeof result === 'function' ? 
       result : 
-      function _cancel(){ _=>clearTimeout(result); };
+      function _cancel(){ clearTimeout(result); };
   };
+  // this.fork = (eh, sh) => {
+
+  //   const result = computation(eh,sh);
+  //   if(typeof result === 'function'){
+  //     result.finally = fn => 
+  //     return result
+  //   }else{
+  //     return function _cancel(){ clearTimeout(result); };
+  //   }
+  // };
+
+  //just for fun
+  this.computation = annotation ? annotation : logFn(computation);
 };
 //clear timeout stuff here is just for fun
 
 
-Task.of = Task.prototype.of = x => new Task((a, b) => b(x));
+Task.of = Task.prototype.of = x => new Task((a, b) => b(x), `=> ${x}`);
 
 
-Task.rejected = x => new Task((a, b) => a(x));
+Task.rejected = x => new Task((a, b) => a(x), `rejected~> ${x}`);
 Task.prototype.flog = function(){
   return this.fork(e=>console.error(e), x=>console.log(x))
 }
@@ -28,7 +54,7 @@ Task.prototype.map = function map(f) {
       a => left(a),
       b => right(f(b))
     )
-  );
+  , `${this.computation} |> ${logFn(f)}`);
 };
 
 Task.prototype.chain = function _chain(f) {
@@ -43,7 +69,7 @@ Task.prototype.chain = function _chain(f) {
       );
       return cancel ? cancel : (cancel = outerFork, x =>cancel());
     }
-  );
+   ,`${this.computation} |> ${logFn(f)}`);
 };
 
 Task.prototype.ap = function _ap(that) {
@@ -91,21 +117,31 @@ Task.prototype.ap = function _ap(that) {
       leftAp(); 
       rightAp()
     };
-  });
+  }, `${this.computation} <*> ${that.computation}`);
 };
+
+//doesn't include cancelation
+Task.prototype.orElse = function(f){
+  return new Task(
+    (left, right) => this.fork(
+      a => right(f(a)),
+      b => right(b)
+    )
+  );
+}
+
 
 /*adapters*/
 
 const taskify = promiseapi => (...args) => new Task((rej,res)=>promiseapi(...args).then(res).catch(rej));
 
-
-
-const fetchTask = taskify(fetch);
-
-
-// const fetchBatch = (resource, config={}) => new Task(function(reject, resolve){
-//   fetch().then(x=>resolve(x)).catch(e=>reject(e));
-// });
+const fetchTask = (...args) => new Task(function(reject, resolve){
+  try{
+    fetch(...args).then(x=>resolve(x)).catch(e=>reject(e));
+  }catch(e){
+    reject(e);
+  }
+});
 
 Task.fetch = fetchTask;
 Task.taskify = taskify;

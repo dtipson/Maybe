@@ -49,14 +49,27 @@ Left.prototype.concat = function(e) {
   });
 };
 
-///???
-Either.prototype.fold = Either.prototype.reduce = function(f, g) {
+Either.prototype.fold = function(f, g) {
   return this.cata({
     Left: f,
     Right: g
   });
 };
 
+Either.prototype.toString = function() {
+  return this.cata({
+    Left: l => `Left[${l}]`,
+    Right: r => `Right[${r}]`
+  });
+};
+
+
+Either.prototype.swap = function() {
+    return this.fold(
+        (l) => Right(l),
+        (r) => Left(r)
+    );
+};
 
 
 Either.prototype.chain = function(f) {

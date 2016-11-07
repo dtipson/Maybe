@@ -47,7 +47,7 @@ const iso = dimap;
 iso.mapISO = iso(x=>[...x], xs=>new Map(xs));
 
 
-//https://github.com/DrBoolean/immutable-ext
+//based off of https://github.com/DrBoolean/immutable-ext
 Map.prototype.concat = function(otherMap){
   const newMap = [];
   for (let [key, value] of this) {

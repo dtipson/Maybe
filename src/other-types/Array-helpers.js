@@ -8,6 +8,11 @@ Array.prototype.chain = function(f){
 Array.prototype.ap = function(a) {
   return this.reduce( (acc,f) => acc.concat( a.map(f) ), []);//also works, & doesn't use chain
 };
+Array.prototype.flap = function(a) {
+  //??? reversed version?
+};
+
+
 Array.prototype.sequence = function(point){
     return this.reduceRight(
       function(acc, x) {
@@ -18,6 +23,22 @@ Array.prototype.sequence = function(point){
       point([])
     );
 };
+//from fantasyland: https://github.com/safareli/fantasy-land/blob/98e363427c32a67288d45063b0a5627b912ee8b6/internal/patch.js#L13
+//do these use the reversed .ap?
+Array.prototype.flsequence = function(f, p) {
+  return this.map(f).reduce(
+    (ys, x) => ys.ap(x.map(y => z => z.concat(y))),
+    p([])
+  );
+};
+Array.prototype.fltraverse = function(f, p) {
+  return this.map(f).reduce(
+    (ys, x) => ys.ap(x.map(y => z => z.concat(y))),
+    p([])
+  );
+};
+
+
 
 Array.prototype.extend = function(exfn){
   return this.map((x,i,arr) => exfn(arr.slice(i)));//passes current item + the rest of the array
@@ -42,7 +63,7 @@ Array.prototype.extract = function(){
 
 
 Array.prototype.traverse = function(f, point){
-    return this.map(f).sequence(point||f);//common enough that it'll be the same to allow that
+    return this.map(f).sequence(point);
 };
 
 

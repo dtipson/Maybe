@@ -5092,6 +5092,7 @@ module.exports = Immutable
 }));
 },{}],4:[function(require,module,exports){
 const {curry, compose, head, init, last, tail, prop} = require('../src/other-types/pointfree.js');
+const Task  = require('../src/other-types/Task.js');
 
 function Maybe(){//create a prototype for Nothing/Just to inherit from
     throw new TypeError('Maybe is not called directly');
@@ -5176,10 +5177,26 @@ Object.assign(Maybe, {
   lift: fn => x => Just(fn(x)),
   fromFilter: fn => x => fn(x) ? Just(x) : Nothing,
   maybe: curry((nothingVal, justFn, M) => M.reduce( (_,x) => justFn(x), nothingVal )),//no accumulator usage
-  head: compose(fromNullable, head),//safehead
+  head: compose(fromNullable, head),//safehead, which is a natural transformation!
   last: compose(fromNullable, last),//safelast
   prop: namespace => compose(fromNullable, prop(namespace))//safeprop
 });
+
+//additional FL method
+Maybe.prototype.alt = function(b) {
+  return this.cata({
+    Just: _ => this,
+    Nothing: () => b,
+  });
+};
+Maybe.zero = Maybe.prototype.zero = _ => Nothing;
+Maybe.prototype.toTask = function(rejmsg) {
+  return this.cata({
+    Just: x => Task.of(x),
+    Nothing: () => Task.rejected(rejmsg),
+  });
+};
+
 
 const maybe = Maybe.maybe;//pretty important pattern, yo
 
@@ -5315,7 +5332,7 @@ const process = maybe(create, update, maybeRecord);
 
 process(4);
 */
-},{"../src/other-types/pointfree.js":28}],5:[function(require,module,exports){
+},{"../src/other-types/Task.js":19,"../src/other-types/pointfree.js":28}],5:[function(require,module,exports){
 const {Maybe, Nothing, Just} = require('../../src/Maybe.js');
 
 const createVideo = videoURL => {
@@ -5522,7 +5539,7 @@ module.exports = {
 //   v.muted = !v.muted;
 // });
 
-document.querySelectorAll('button')[0].addEventListener('click',function(){
+document.querySelectorAll('button')[1].addEventListener('click',function(){
   document.body.innerHTML = '';
   requestRecord().then(stream => {
     recordInfinite(3000)(stream);
@@ -5540,6 +5557,11 @@ Array.prototype.chain = function(f){
 Array.prototype.ap = function(a) {
   return this.reduce( (acc,f) => acc.concat( a.map(f) ), []);//also works, & doesn't use chain
 };
+Array.prototype.flap = function(a) {
+  //??? reversed version?
+};
+
+
 Array.prototype.sequence = function(point){
     return this.reduceRight(
       function(acc, x) {
@@ -5550,6 +5572,22 @@ Array.prototype.sequence = function(point){
       point([])
     );
 };
+//from fantasyland: https://github.com/safareli/fantasy-land/blob/98e363427c32a67288d45063b0a5627b912ee8b6/internal/patch.js#L13
+//do these use the reversed .ap?
+Array.prototype.flsequence = function(f, p) {
+  return this.map(f).reduce(
+    (ys, x) => ys.ap(x.map(y => z => z.concat(y))),
+    p([])
+  );
+};
+Array.prototype.fltraverse = function(f, p) {
+  return this.map(f).reduce(
+    (ys, x) => ys.ap(x.map(y => z => z.concat(y))),
+    p([])
+  );
+};
+
+
 
 Array.prototype.extend = function(exfn){
   return this.map((x,i,arr) => exfn(arr.slice(i)));//passes current item + the rest of the array
@@ -5574,7 +5612,7 @@ Array.prototype.extract = function(){
 
 
 Array.prototype.traverse = function(f, point){
-    return this.map(f).sequence(point||f);//common enough that it'll be the same to allow that
+    return this.map(f).sequence(point);
 };
 
 
@@ -5710,9 +5748,9 @@ module.exports = Const;
 
 */
 },{}],9:[function(require,module,exports){
-//lots of similarities here to Task, which is a sort of this married to an Either
-//fork and handler are very similar: computation doesn't run until fork is calleds
-
+//lots of similarities here to Task and Reader
+//fork and handler are very similar: computation doesn't run until fork is called
+//https://gist.github.com/tel/9a34caf0b6e38cba6772
 function Continuation(fork) {
   if (!(this instanceof Continuation)) {
     return new Continuation(fork);
@@ -5746,6 +5784,8 @@ Continuation.fill = value => Continuation.ask.map(resume => resume(value)).fork(
 Continuation.prototype.fork = function(resume) {
   return this.fork(resume);
 };
+
+Continuation.prototype.run = Continuation.prototype.fork;
 
 Continuation.prototype.escape = function() {
   return this.fork(x=>x);
@@ -5921,14 +5961,27 @@ Left.prototype.concat = function(e) {
   });
 };
 
-///???
-Either.prototype.fold = Either.prototype.reduce = function(f, g) {
+Either.prototype.fold = function(f, g) {
   return this.cata({
     Left: f,
     Right: g
   });
 };
 
+Either.prototype.toString = function() {
+  return this.cata({
+    Left: l => `Left[${l}]`,
+    Right: r => `Right[${r}]`
+  });
+};
+
+
+Either.prototype.swap = function() {
+    return this.fold(
+        (l) => Right(l),
+        (r) => Left(r)
+    );
+};
 
 
 Either.prototype.chain = function(f) {
@@ -6049,17 +6102,31 @@ const {S}  = require('../../src/other-types/pointfree.js');
         return this.contramap(a2b).map(c2d);
     }
 },{"../../src/other-types/pointfree.js":28}],13:[function(require,module,exports){
-function IO(fn) {
+const Task  = require('../../src/other-types/Task.js');
+
+const logFn = fn => {
+  if(fn.name){
+    return fn.name
+  }else{
+    let stringFn = fn.toString().replace(/\s\s+/g, ' ');
+    return stringFn.length>20 ?
+      `(${stringFn.replace(/(=>)(.*)/, "$1 ...")})` :
+      `(${stringFn})`
+  }
+};
+
+function IO(fn, annotation) {
   if (!(this instanceof IO)) {
-    return new IO(fn);
+    return new IO(fn, annotation);
   }
   this.runIO = fn;//IO creates an extra control layer above a function
+  this.computation = annotation ? annotation : logFn(fn);
 }
 
-IO.of = IO.prototype.of = x => IO(_=>x);//basically the same as IO(K(x))
+IO.of = IO.prototype.of = x => IO(_=>x, `() => ${x}`);//basically the same as IO(K(x))
 
 IO.prototype.chain = function(f) {
-  return IO(_ => f(this.runIO()).runIO() );
+  return IO(_ => f(this.runIO()).runIO() , `${this.computation} |> ${logFn(f)}`);
 };
 //operations sequenced in next stack?
 IO.prototype.fork = function(f) {
@@ -6071,7 +6138,11 @@ IO.prototype.ap = function(a) {
 };
 
 IO.prototype.map = function(f) {
-  return this.chain( a => IO.of(f(a)) );
+  return new IO(_=>f(this.runIO()), `${this.computation} |> ${logFn(f)}`);
+};
+
+IO.prototype.toTask = function(f) {
+  return new Task((rej, res) => res(this.runIO()));
 };
 
 //?unproven/maybe not possible?
@@ -6084,12 +6155,13 @@ IO.$ = selectorString => new IO(_ => Array.from(document.querySelectorAll(select
 
 IO.$id = idString => new IO(_ => document.getElementById(idString));
 IO.setStyle = (style, to) => node => new IO(_ => { node.style[style] = to; return node;}  );
+IO.setAttr = (attr, to) => node => new IO(_ => { node[attr] = to; return node;}  );
 
 const getNodeChildren = node => Array.from(node.children);
 
 
 module.exports = IO;
-},{}],14:[function(require,module,exports){
+},{"../../src/other-types/Task.js":19}],14:[function(require,module,exports){
 const {I}  = require('../../src/other-types/pointfree.js');
 
 function Identity(v) {
@@ -6101,7 +6173,9 @@ function Identity(v) {
 
 Identity.prototype.of = x => new Identity(x);
 Identity.of = Identity.prototype.of;
-
+Identity.prototype.toString = function() {
+  return `Identity[${this.x}]`
+};
 Identity.prototype.map = function(f) {
   return new Identity(f(this.x));
 };
@@ -6117,16 +6191,33 @@ Identity.prototype.flap = function(ap2) {
 Identity.prototype.ap2 = function(b) {
   return new Identity(b.x(this.x));
 };
+
+
 Identity.prototype.sequence = function(of){
-  return this.x.map(Identity.of); 
+  return this.x.map(Identity.of);//we use sequence when an inner type exists that has a map method, so returning it with ITS value wrapped in Id is sufficient
 };
 Identity.prototype.traverse = function(f, of){
-  return this.map(f).sequence(of); 
+  return this.map(f).sequence(of);//transform, then sequence
 };
 
-//fold and chain are the same thing for Identitys
-Identity.prototype.chain = Identity.prototype.reduce = Identity.prototype.fold = function(f) {
+//same result, different derivation
+Identity.prototype.traverse2 = function(f, of){
+  return f(this.x).map(Identity);
+};
+Identity.prototype.sequence2 = function(of){
+  return this.traverse(I);
+};
+
+
+
+
+//fold and chain are the same thing for Identity!
+Identity.prototype.chain = 
+Identity.prototype.fold = function(f) {
   return f(this.x);
+};
+Identity.prototype.reduce = function(f, acc) {
+  return f(acc, this.x);
 };
 Identity.prototype.equals = function(that){
   return that instanceof Identity && that.x === this.x;
@@ -6230,6 +6321,10 @@ function Reader(run) {
   this.run = run;
 }
 
+Reader.prototype.toString = function(a) {
+  return `a => ${this.run}(a)`;
+};
+
 Reader.prototype.chain = function(f) {
   return new Reader( r => f(this.run(r)).run(r) );
 };
@@ -6248,7 +6343,7 @@ Reader.prototype.contramap = function(f) {
   return this.chain( a => Reader.of(f(a)) );
 };
 
-//no, and probably not actually possible or desirable: Reader wants to be externalized
+//no, and probably not actually possible or desirable: Reader wants to be externalized, not swapped inside anything
 Reader.prototype.traverse = function(of, f){
   return Reader.of(x=>of(this)).ap(this).run()
 }
@@ -6271,10 +6366,43 @@ Reader.ask = Reader(x=>x);
 Reader.binary = fn => x => Reader.ask.map(y => fn(y, x));//specify a binary function that will call run's(y) and x, running the function as if both values were magically summoned and then returning an output
 Reader.binaryC = fn => x => Reader.ask.map(y => fn(y)(x));//specify a CURRIED binary function that will call run's(y) and x, running the function as if both values were magically summoned and then returning an output
 Reader.exec = x => Reader.ask.map(fn => fn(x));//for single functions
-Reader.execer = R => R.chain(x => Reader.ask.map(fn => fn(x)));//for single functions, baking in chain
+Reader.execer = R => R.chain(Reader.exec);//for single functions, baking in chain
 Reader.invoke = methodname => x => Reader.ask.map(invoke(methodname)).ap(Reader.of(x));//for interfaces w/ named methods
 Reader.invoker = methodname => R => R.chain(x => Reader.ask.map(invoke(methodname)).ap(Reader.of(x)));//for interfaces w/ named methods, baking in the chain
 Reader.run = R => R.run;//can be used inline in a composition to expose the run function as the callable interface
+
+
+Reader.ReaderT = M => {
+    function ReaderT(run) {
+      if (!(this instanceof ReaderT)) {
+        return new ReaderT(run);
+      }
+      this.run = run;
+    }
+
+    ReaderT.lift = m => ReaderT(constant(m));
+
+    ReaderT.of = a => ReaderT(e => M.of(a));
+
+    ReaderT.ask = ReaderT(e => M.of(e));
+
+    ReaderT.prototype.chain = function(f) {
+        return ReaderT(e => this.run(e).chain(a => f(a).run(e)));
+    };
+
+    ReaderT.prototype.map = function(f) {
+      return this.chain(a => ReaderT.of( f(a) ) );
+    };
+
+    ReaderT.prototype.ap = function(a) {
+      return ReaderT(e => this.run(e).ap(a.run(e)));
+    };
+
+    return ReaderT;
+};
+
+
+
 
 module.exports = Reader;
 
@@ -6423,7 +6551,7 @@ const Store = function(set, get){
   this.get = get;
 };
 
-// gets the value, and also ensures that it's set to whatever it got?
+// gets the value, and also ensures that it sets to whatever it got? Seems to extecute the action
 Store.prototype.extract = function() {
     return this.set(this.get());
 };
@@ -6465,8 +6593,21 @@ Store.prototype.over = function(f) {
 module.exports = Store;
 },{}],19:[function(require,module,exports){
 
+
+const logFn = fn => {
+  if(fn.name){
+    return fn.name
+  }else{
+    let stringFn = fn.toString().replace(/\s\s+/g, ' ');
+    return stringFn.length>25 ?
+      `(${stringFn.replace(/(=>)(.*)/, "$1 ...")})` :
+      `(${stringFn})`
+  }
+};
+
+
 // fn => Task fn
-const Task = function(computation){
+const Task = function(computation, annotation){
   if (!(this instanceof Task)) {
     return new Task(computation);
   }
@@ -6474,16 +6615,29 @@ const Task = function(computation){
     const result = computation(eh,sh);
     return typeof result === 'function' ? 
       result : 
-      function _cancel(){ _=>clearTimeout(result); };
+      function _cancel(){ clearTimeout(result); };
   };
+  // this.fork = (eh, sh) => {
+
+  //   const result = computation(eh,sh);
+  //   if(typeof result === 'function'){
+  //     result.finally = fn => 
+  //     return result
+  //   }else{
+  //     return function _cancel(){ clearTimeout(result); };
+  //   }
+  // };
+
+  //just for fun
+  this.computation = annotation ? annotation : logFn(computation);
 };
 //clear timeout stuff here is just for fun
 
 
-Task.of = Task.prototype.of = x => new Task((a, b) => b(x));
+Task.of = Task.prototype.of = x => new Task((a, b) => b(x), `=> ${x}`);
 
 
-Task.rejected = x => new Task((a, b) => a(x));
+Task.rejected = x => new Task((a, b) => a(x), `rejected~> ${x}`);
 Task.prototype.flog = function(){
   return this.fork(e=>console.error(e), x=>console.log(x))
 }
@@ -6494,7 +6648,7 @@ Task.prototype.map = function map(f) {
       a => left(a),
       b => right(f(b))
     )
-  );
+  , `${this.computation} |> ${logFn(f)}`);
 };
 
 Task.prototype.chain = function _chain(f) {
@@ -6509,7 +6663,7 @@ Task.prototype.chain = function _chain(f) {
       );
       return cancel ? cancel : (cancel = outerFork, x =>cancel());
     }
-  );
+   ,`${this.computation} |> ${logFn(f)}`);
 };
 
 Task.prototype.ap = function _ap(that) {
@@ -6557,21 +6711,31 @@ Task.prototype.ap = function _ap(that) {
       leftAp(); 
       rightAp()
     };
-  });
+  }, `${this.computation} <*> ${that.computation}`);
 };
+
+//doesn't include cancelation
+Task.prototype.orElse = function(f){
+  return new Task(
+    (left, right) => this.fork(
+      a => right(f(a)),
+      b => right(b)
+    )
+  );
+}
+
 
 /*adapters*/
 
 const taskify = promiseapi => (...args) => new Task((rej,res)=>promiseapi(...args).then(res).catch(rej));
 
-
-
-const fetchTask = taskify(fetch);
-
-
-// const fetchBatch = (resource, config={}) => new Task(function(reject, resolve){
-//   fetch().then(x=>resolve(x)).catch(e=>reject(e));
-// });
+const fetchTask = (...args) => new Task(function(reject, resolve){
+  try{
+    fetch(...args).then(x=>resolve(x)).catch(e=>reject(e));
+  }catch(e){
+    reject(e);
+  }
+});
 
 Task.fetch = fetchTask;
 Task.taskify = taskify;
@@ -7301,7 +7465,7 @@ First.prototype.concat = function(y) {
 //but this has no possible empty interface
 
 
-//not anywhere near right, but a possible way to make any semigroup work as a monoid
+//not anywhere near right, but there IS a possible way to make any semigroup work as a monoid, sort of by elevating it up a level
 const Firsty = function(x){
   if (!(this instanceof Firsty)) {
     return new Firsty(x);
@@ -7418,9 +7582,47 @@ const Task  = require('../../src/other-types/Task.js');
 
 //natural transformation
 const idToTask = i => i.fold(Task.of);
-const eitherToTask = e => e.fold(Task.rejected,Task.of);
+const maybeToTaskWMsg = msg => m => m.reduce((acc,x)=>Task.of(x), Task.rejected(msg));
+const maybeToTask = maybeToTaskWMsg(null);
+const maybeToIO = m => m.reduce((acc,x)=>IO.of(x), IO.of(undefined));
+const maybeToEither = m => m.reduce((acc,x)=>Either.of(x), Left(null));
+const eitherToTask = e => e.fold(Task.rejected, Task.of);
 const ioToTask = i => new Task((rej, res) => res(i.runIO()));
 const readerToTask = r => new Task((rej,res)=>res(r.run()));
+//const eitherToIO = e => e.fold(x=>IO.of(undefined),x=>IO.of(x))
+const idToArray = id => [id.fold(I)];
+
+//safeHead/Maybe.head IS a natural transformation! Array -> Maybe
+//so is Map({hi:true}).toArray()
+//reverse?
+const maybeToArray = m => m.cata({Just:x=>[x],Nothing:_=>[]});// or, m.reduce((acc,x)=>acc.concat(x),[]);
+const readerToMaybe = r => fromNullable(r.run());//I don't think so... https://bartoszmilewski.com/2015/04/07/natural-transformations/
+
+/*
+[[1,5,6],['a','b','c']].chain(Maybe.head).sequence(Maybe.of)
+t1(t2).chain(nt t2->t3).sequence(t3.of)
+
+.chain(f).sequence(of) = ???
+
+other examples of this pattern?
+
+Just(Just(9)).map(maybeToEither).sequence()
+
+
+
+
+Task.of('#email')
+  .map(IO.$)
+  .chain(ioToTask)
+  .map(Maybe.head)
+  .chain(maybeToTask)
+  .map(IO.setAttr('value','dtipsonsyasdasdasd@gmail.com'))
+  .chain(ioToTask)
+  .fork(e=>console.log(e), I);
+
+
+
+*/
 
 /*
 Db.find Task of an Either(user|null)
@@ -7464,7 +7666,14 @@ module.exports = {
   idToTask,
   eitherToTask,
   ioToTask,
-  readerToTask
+  readerToTask,
+  idToArray,
+  maybeToArray,
+  readerToMaybe,
+  maybeToTask,
+  maybeToTaskWMsg,
+  maybeToEither,
+  maybeToIO
 }
 },{"../../src/other-types/Task.js":19}],28:[function(require,module,exports){
 const compose  = (fn, ...rest) =>
@@ -7516,7 +7725,7 @@ const iso = dimap;
 iso.mapISO = iso(x=>[...x], xs=>new Map(xs));
 
 
-//https://github.com/DrBoolean/immutable-ext
+//based off of https://github.com/DrBoolean/immutable-ext
 Map.prototype.concat = function(otherMap){
   const newMap = [];
   for (let [key, value] of this) {
