@@ -15,7 +15,7 @@ const logFn = fn => {
 // fn => Task fn
 const Task = function(computation, annotation){
   if (!(this instanceof Task)) {
-    return new Task(computation);
+    return new Task(computation, annotation);
   }
   this.fork = (eh, sh) => {
     const result = computation(eh,sh);
@@ -130,6 +130,10 @@ Task.prototype.orElse = function(f){
   );
 }
 
+Task.timeout = ms => Task((rej,res)=> setTimeout(res,ms),`_=>Task.timeout(${ms})`);
+
+Task.liftWait = ms => x => Task((rej,res)=> setTimeout(_=>res(x),ms),`x=>Task.liftWait(${ms})`);
+
 
 /*adapters*/
 
@@ -147,7 +151,6 @@ Task.fetch = fetchTask;
 Task.taskify = taskify;
 
 //x=>x.json() -> Task.to('json')
-Task.to = method => resource => 
-  new Task((rej,res) => resource[method]().then(res,rej))
+Task.to = method => resource => new Task((rej,res) => resource[method]().then(res).catch(rej));
 
 module.exports = Task;

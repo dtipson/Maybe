@@ -23,12 +23,15 @@ const andCall = curry(
   (methodname, obj) => obj[methodname](...args)
 );
 
-
+//these assume that Function/Promise/Array have .ap/.chain/etc. defined, but those could be polyfilled
 const ap = curry((A, A2) => A.ap(A2));
 const map = curry((f, F) => F.map(x=>f(x)));//guard against Array.map
-const reduce = curry((f, acc, F) => F.reduce(f,acc));
+const reduce = curry((f, acc, Foldable) => Foldable.reduce(f,acc));
 const chain = curry((f, M) => M.chain(f));
-
+  //function version
+  // if (typeof monad === 'function') {
+  //   return function(x) { return fn(monad(x))(x); };
+  // }
 
 const lift = map;
 const liftA2 = curry((f, A1, A2) => A1.map(f).ap(A2));//
@@ -46,6 +49,10 @@ const iso = dimap;
 
 iso.mapISO = iso(x=>[...x], xs=>new Map(xs));
 
+const Iso = (to,from) => ({to,from});
+
+const singleton = Iso(e=>e.fold(_=>[],x=>[x]),([x])=>x?Right(x):Left(undefined))
+const filterEither = (e,pred) => singleton.from(singleton.to(e).filter(pred))
 
 //based off of https://github.com/DrBoolean/immutable-ext
 Map.prototype.concat = function(otherMap){
@@ -87,7 +94,7 @@ const init = xs => xs.slice(0,-1);
 const tail = xs => xs.tail || xs.slice(1, Infinity);
 const last = xs => xs.last ? xs.last() : xs.slice(-1)[0];
 const prop = namespace => obj => obj[namespace];
-
+const append = x => xs => xs.concat(x);
 
 //these two include polyfills for arrays
 const extend = fn => W => {
@@ -101,8 +108,9 @@ const extract = W => {
     head(W);
 };
 
-const concat = curry( (x, y) => x.concat(y));
+const concat = curry( (xs, x) => xs.concat(x));
 //inferring empty is not a great idea here...
+//m here stands for monoid, not monad
 const mconcat = (xs, empty) => xs.length||xs.size() ? xs.reduce(concat, empty) : empty ? empty() : xs.empty();
 const bimap = curry((f,g,B)=> B.bimap(f,g)); 
 
@@ -193,15 +201,12 @@ const converge = curry((f, g, h) => (...args) => f(g(...args), h(...args)));
 const apply  = f => arr => f(...arr)
 const unapply = f => (...args) => f(args);
 
-
-
-
-
 module.exports = {
   I,
   K,
   S,
   W,
+  append,
   apply,
   unapply,
   compose,
@@ -235,6 +240,7 @@ module.exports = {
   lmap,
   rmap,
   iso,
+  Iso,
   dimap,
   any,
   all,

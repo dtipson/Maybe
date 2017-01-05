@@ -54,8 +54,11 @@ Just.prototype.fold = function(_, f) { return f(this.value); };
 Just.prototype.filter = function(fn){ return this.chain(x=> fn(x)? this : Nothing ); };//test the inner value with a function
 
 //assuming that the inner value has a concat method, concat it with another Just. Falls back to + for strings and numbers
+// Just.prototype.concat = function(b){
+//   return b.value && !Maybe.isNull(b.value) ? Just(this.value.concat ? this.value.concat(b.value) : this.value + b.value) : this 
+// };
 Just.prototype.concat = function(b){
-  return b.value && !Maybe.isNull(b.value) ? Just(this.value.concat ? this.value.concat(b.value) : this.value + b.value) : this 
+  return this.chain(a=>b.map(x=>a.concat(b)));
 };
 Just.prototype.equals = function(y){ return y.value === this.value; };//strictly compare the inner values
 //Just.prototype[Symbol.toPrimitive] = Just.prototype.getOrElse = function(){ return this.value; };//extract the inner value when forcibly coerced to deliver a value

@@ -1,4 +1,4 @@
-const {curry, compose, K, I}  = require('../../src/other-types/pointfree.js');
+const {curry, compose, K, I, head, tail}  = require('../../src/other-types/pointfree.js');
 
 function Either(...args){
   switch (args.length) {
@@ -66,11 +66,21 @@ Either.prototype.toString = function() {
 
 Either.prototype.swap = function() {
     return this.fold(
-        (l) => Right(l),
-        (r) => Left(r)
+        Right,
+        Left
     );
 };
 
+Either.prototype.orElse = function(f) {
+    return this.fold(
+        l => (typeof f !== "function") ? Right(f(l)) : Right(f),
+        r => this
+    );
+};
+
+Either.prototype.merge = function(f) {
+    return this.fold(I,I);
+};
 
 Either.prototype.chain = function(f) {
   return this.fold(K(this), f);
@@ -112,14 +122,19 @@ Either.try = f => (...args) => {
   }
 };
 
-
+Either.of = x => new Right(x);
 Either.fromNullable = x => (x != null) ? Right(x) : Left();
 
+Either.safeHead = compose(Either.fromNullable, head);//safehead, which is a natural transformation
+Either.safeTail = compose(Either.fromNullable, tail);//safehead, which is a natural transformation
+
+Either.isEmpty = xs => Array.isArray(xs) && xs.length ? Right(xs):Left([]);
 
 Either.fromPredicate = curry(
   (fn, x) => fn(x) ? Right(x) : Left(x)
 );
-Either.of = x => new Right(x);
+Either.fromFilter = Either.fromPredicate;
+
 Either.either = curry((leftFn, rightFn, E) => {
   if(!(E instanceof Either)){
     throw new TypeError('invalid type given to Either.either');

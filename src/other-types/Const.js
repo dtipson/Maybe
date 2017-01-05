@@ -10,7 +10,7 @@ Const.of = x => new Const(x);
 Const.prototype.concat = function(y) {
     return new Const(this.x.concat(y.x));
 };
-//so, since Const "hides" a real value behind an ignored value, concat is actually going to concat the inner, hidden values.
+//so, since Const "hides" a real value behind an ignored value, concat is actually going to concat the inner, hidden values behind the scenes.
 
 Const.prototype.ap = function(fa) {
     return this.concat(fa);//concats inner values instead of running function: the function is the "ignored" outer here

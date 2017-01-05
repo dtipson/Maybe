@@ -1,4 +1,5 @@
 const {curry}  = require('../../src/other-types/pointfree.js');
+const IO = require('../../src/other-types/IO.js');
 
 //delay :: Integer -> Promise null
 const delay = ms => new Promise(resolve => global.setTimeout(resolve, ms));
@@ -58,6 +59,24 @@ const setStyleProp = (propString, newValue) => node => IO(_ => { node.style[prop
 //Reader.ask.map(IO.$).map(map(Maybe.head)).map(chain(traverse(setStyleProp('color','red'), IO.of))).map(x=>x.runIO()).run
 //document.addEventListener('click', compose(runIO, chain(setStyleProp('color','red')), IO.of, e=>e.target))
 
+  //utility function for setting and getting cookies
+  function gup(name) {
+      name = name.replace(/(\[|\])/g,"\\$1");
+      var regex = new RegExp("[\\?&]"+name+"=([^&#]*)"),
+          results = regex.exec( window.location.href );
+      return ( results === null )?"":results[1];
+  }
+  //get cookies
+  function c(k){return(document.cookie.match('(^|; )'+k+'=([^;]*)')||0)[2];}
+
+  function setcookie(n,v,ex) { 
+    document.cookie = n+"="+v+"; Path=/; domain="+window.location.hostname+"; "+((ex)?"expires="+new Date(Date.now()+(ex*864e5)).toGMTString():'');
+    return v;
+  }
+
+  const [gupIO, cIO, setcookieIO] = [gup,c,setcookie].map(IO.lift);
+
+
 
 module.exports = {
   add,
@@ -74,5 +93,6 @@ module.exports = {
   getNodeChildren,
   setHTML,
   setStyleProp,
-  booleanEquals
+  booleanEquals,
+  gupIO, cIO, setcookieIO
 };

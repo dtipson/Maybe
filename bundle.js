@@ -17,8 +17,11 @@ const State = require('./src/other-types/State.js');
 const Store = require('./src/other-types/Store.js');
 const Tuple = require('./src/other-types/Tuple.js');
 const Task = require('./src/other-types/Task.js');
+const RemoteData = require('./src/other-types/RemoteData.js');
 const Writer = require('./src/other-types/Writer-array.js');
 const { List, Map } = require('immutable-ext');
+
+const {NotAsked,Requested,Loading,Failure,Success} = RemoteData;
 
 Object.assign(
   window,
@@ -27,15 +30,16 @@ Object.assign(
   require('./src/media-recorder/videobooth.js'),
   require('./src/other-types/Either.js'),
   require('./src/other-types/lenses.js'),
-  {Compose, Const, Continuation, Cont:Continuation, List, Task, Coyoneda, Id: Identity, Identity, Box: Identity, IO, Map, Reader, Tuple, State, Store, Writer},
+  {Compose, Const, Continuation, Cont:Continuation, List, Task, Coyoneda, Id: Identity, Identity, Box: Identity, IO, Map, Reader, RemoteData, Tuple, State, Store, Writer, NotAsked,Requested,Loading,Failure,Success},
   require('./src/other-types/pointfree.js'),
+  require('./src/other-types/merges.js'),
   require('./src/other-types/monoids.js'),
   require('./src/other-types/Tree.js'),
-  require('./src/other-types/Validation.js'),
+  //require('./src/other-types/Validation.js'),
   require('./src/other-types/natural-transformations.js'),
   require('./src/other-types/utility.js')
 );
-},{"./src/Maybe.js":4,"./src/media-recorder/videobooth.js":5,"./src/other-types/Array-helpers.js":6,"./src/other-types/Compose.js":7,"./src/other-types/Const.js":8,"./src/other-types/Continuation.js":9,"./src/other-types/Coyoneda.js":10,"./src/other-types/Either.js":11,"./src/other-types/Function-helpers.js":12,"./src/other-types/IO.js":13,"./src/other-types/Identity.js":14,"./src/other-types/Promise-helpers.js":15,"./src/other-types/Reader.js":16,"./src/other-types/State.js":17,"./src/other-types/Store.js":18,"./src/other-types/Task.js":19,"./src/other-types/Tree.js":20,"./src/other-types/Tuple.js":21,"./src/other-types/Validation.js":22,"./src/other-types/Writer-array.js":23,"./src/other-types/daggy.js":24,"./src/other-types/lenses.js":25,"./src/other-types/monoids.js":26,"./src/other-types/natural-transformations.js":27,"./src/other-types/pointfree.js":28,"./src/other-types/utility.js":29,"immutable-ext":2}],2:[function(require,module,exports){
+},{"./src/Maybe.js":4,"./src/media-recorder/videobooth.js":5,"./src/other-types/Array-helpers.js":6,"./src/other-types/Compose.js":7,"./src/other-types/Const.js":8,"./src/other-types/Continuation.js":9,"./src/other-types/Coyoneda.js":10,"./src/other-types/Either.js":11,"./src/other-types/Function-helpers.js":12,"./src/other-types/IO.js":13,"./src/other-types/Identity.js":14,"./src/other-types/Promise-helpers.js":15,"./src/other-types/Reader.js":16,"./src/other-types/RemoteData.js":17,"./src/other-types/State.js":18,"./src/other-types/Store.js":19,"./src/other-types/Task.js":20,"./src/other-types/Tree.js":21,"./src/other-types/Tuple.js":22,"./src/other-types/Writer-array.js":23,"./src/other-types/daggy.js":24,"./src/other-types/lenses.js":25,"./src/other-types/merges.js":26,"./src/other-types/monoids.js":27,"./src/other-types/natural-transformations.js":28,"./src/other-types/pointfree.js":29,"./src/other-types/utility.js":30,"immutable-ext":2}],2:[function(require,module,exports){
 const Immutable = require('immutable')
 const {List, Map} = Immutable
 
@@ -5147,8 +5151,11 @@ Just.prototype.fold = function(_, f) { return f(this.value); };
 Just.prototype.filter = function(fn){ return this.chain(x=> fn(x)? this : Nothing ); };//test the inner value with a function
 
 //assuming that the inner value has a concat method, concat it with another Just. Falls back to + for strings and numbers
+// Just.prototype.concat = function(b){
+//   return b.value && !Maybe.isNull(b.value) ? Just(this.value.concat ? this.value.concat(b.value) : this.value + b.value) : this 
+// };
 Just.prototype.concat = function(b){
-  return b.value && !Maybe.isNull(b.value) ? Just(this.value.concat ? this.value.concat(b.value) : this.value + b.value) : this 
+  return this.chain(a=>b.map(x=>a.concat(b)));
 };
 Just.prototype.equals = function(y){ return y.value === this.value; };//strictly compare the inner values
 //Just.prototype[Symbol.toPrimitive] = Just.prototype.getOrElse = function(){ return this.value; };//extract the inner value when forcibly coerced to deliver a value
@@ -5332,7 +5339,7 @@ const process = maybe(create, update, maybeRecord);
 
 process(4);
 */
-},{"../src/other-types/Task.js":19,"../src/other-types/pointfree.js":28}],5:[function(require,module,exports){
+},{"../src/other-types/Task.js":20,"../src/other-types/pointfree.js":29}],5:[function(require,module,exports){
 const {Maybe, Nothing, Just} = require('../../src/Maybe.js');
 
 const createVideo = videoURL => {
@@ -5558,15 +5565,15 @@ Array.prototype.ap = function(a) {
   return this.reduce( (acc,f) => acc.concat( a.map(f) ), []);//also works, & doesn't use chain
 };
 Array.prototype.flap = function(a) {
-  //??? reversed version?
+  return a.reduce( (acc,f) => acc.concat( this.map(f) ), []);//also works, & doesn't use chain
 };
 
 
 Array.prototype.sequence = function(point){
-    return this.reduceRight(
+    return this.reduce(
       function(acc, x) {
         return acc
-          .map(innerarray => othertype => [othertype].concat(innerarray) )//puts this function in the type
+          .map(innerarray => othertype => innerarray.concat(othertype) )//puts this function in the type
           .ap(x);//then applies the inner othertype value to it
       },
       point([])
@@ -5574,8 +5581,8 @@ Array.prototype.sequence = function(point){
 };
 //from fantasyland: https://github.com/safareli/fantasy-land/blob/98e363427c32a67288d45063b0a5627b912ee8b6/internal/patch.js#L13
 //do these use the reversed .ap?
-Array.prototype.flsequence = function(f, p) {
-  return this.map(f).reduce(
+Array.prototype.flsequence = function(p) {
+  return this.reduce(
     (ys, x) => ys.ap(x.map(y => z => z.concat(y))),
     p([])
   );
@@ -5706,7 +5713,7 @@ Compose.prototype.map = function(f) {
 };
 
 */
-},{"../../src/other-types/pointfree.js":28}],8:[function(require,module,exports){
+},{"../../src/other-types/pointfree.js":29}],8:[function(require,module,exports){
 function Const(value) {
   if (!(this instanceof Const)) {
     return new Const(value);
@@ -5719,7 +5726,7 @@ Const.of = x => new Const(x);
 Const.prototype.concat = function(y) {
     return new Const(this.x.concat(y.x));
 };
-//so, since Const "hides" a real value behind an ignored value, concat is actually going to concat the inner, hidden values.
+//so, since Const "hides" a real value behind an ignored value, concat is actually going to concat the inner, hidden values behind the scenes.
 
 Const.prototype.ap = function(fa) {
     return this.concat(fa);//concats inner values instead of running function: the function is the "ignored" outer here
@@ -5909,8 +5916,8 @@ Coyoneda.lift = x => Coyoneda(x, I);
 
 module.exports = Coyoneda;
 
-},{"../../src/other-types/pointfree.js":28}],11:[function(require,module,exports){
-const {curry, compose, K, I}  = require('../../src/other-types/pointfree.js');
+},{"../../src/other-types/pointfree.js":29}],11:[function(require,module,exports){
+const {curry, compose, K, I, head, tail}  = require('../../src/other-types/pointfree.js');
 
 function Either(...args){
   switch (args.length) {
@@ -5978,11 +5985,21 @@ Either.prototype.toString = function() {
 
 Either.prototype.swap = function() {
     return this.fold(
-        (l) => Right(l),
-        (r) => Left(r)
+        Right,
+        Left
     );
 };
 
+Either.prototype.orElse = function(f) {
+    return this.fold(
+        l => (typeof f !== "function") ? Right(f(l)) : Right(f),
+        r => this
+    );
+};
+
+Either.prototype.merge = function(f) {
+    return this.fold(I,I);
+};
 
 Either.prototype.chain = function(f) {
   return this.fold(K(this), f);
@@ -6024,14 +6041,19 @@ Either.try = f => (...args) => {
   }
 };
 
-
+Either.of = x => new Right(x);
 Either.fromNullable = x => (x != null) ? Right(x) : Left();
 
+Either.safeHead = compose(Either.fromNullable, head);//safehead, which is a natural transformation
+Either.safeTail = compose(Either.fromNullable, tail);//safehead, which is a natural transformation
+
+Either.isEmpty = xs => Array.isArray(xs) && xs.length ? Right(xs):Left([]);
 
 Either.fromPredicate = curry(
   (fn, x) => fn(x) ? Right(x) : Left(x)
 );
-Either.of = x => new Right(x);
+Either.fromFilter = Either.fromPredicate;
+
 Either.either = curry((leftFn, rightFn, E) => {
   if(!(E instanceof Either)){
     throw new TypeError('invalid type given to Either.either');
@@ -6070,19 +6092,38 @@ module.exports = {
   Left,
   Right
 };
-},{"../../src/other-types/pointfree.js":28}],12:[function(require,module,exports){
+},{"../../src/other-types/pointfree.js":29}],12:[function(require,module,exports){
 //because functions need help too
 
 const {S}  = require('../../src/other-types/pointfree.js');
 
     //Baby's First Reader
     Function.of = x => _ => x;
+    // Function.prototype.join = function(){
+    //     ???
+    // }
     Function.prototype.map = function(f) {
-        return x => f(this(x));//composition
+        return x => f(this(x));//just composition
     }
+    //chain for functions allows you to sub in a function that takes two arguments, effectively having a value get transformed by the monad for the first argument, then also passed in again clean as the second
+    //head.chain(append) -> [3,4,5] -> [3,4,5,3]
+    //(a -> (x -> b)) -> (x -> a) -> (x -> b)
+    //put another way, we can glue a->x and x -> a -> b together, for the same a
+    Function.prototype.chain = function(f) {
+        return x => f(this(x))(x)//supposedly this is akin to the reader monad?
+    }
+
+  //function version
+  // if (typeof monad === 'function') {
+  //   return function(x) { return fn(monad(x))(x); };
+  // }
+
+
+
     //const isTwo = a => a===2
     //const notTwo = isTwo.map(x=>!x)
 
+    //S NEEDS to be curried here for this to work
     Function.prototype.ap = function(f) {
         return S(this)(f);// equivalent to returning x => this(x)(f(x))
     }
@@ -6101,7 +6142,7 @@ const {S}  = require('../../src/other-types/pointfree.js');
     Function.prototype.dimap = function(c2d, a2b) {
         return this.contramap(a2b).map(c2d);
     }
-},{"../../src/other-types/pointfree.js":28}],13:[function(require,module,exports){
+},{"../../src/other-types/pointfree.js":29}],13:[function(require,module,exports){
 const Task  = require('../../src/other-types/Task.js');
 
 const logFn = fn => {
@@ -6129,7 +6170,7 @@ IO.prototype.chain = function(f) {
   return IO(_ => f(this.runIO()).runIO() , `${this.computation} |> ${logFn(f)}`);
 };
 //operations sequenced in next stack?
-IO.prototype.fork = function(f) {
+IO.prototype.fork = function() {
   return IO(_ => new Promise( r => window.setTimeout(()=>r(this.runIO()),0) ));
 };
 
@@ -6141,6 +6182,16 @@ IO.prototype.map = function(f) {
   return new IO(_=>f(this.runIO()), `${this.computation} |> ${logFn(f)}`);
 };
 
+//???? parallel effects?
+IO.prototype.parallel = function(i) {
+  return IO(_=> { this.runIO(); i.runIO(); });
+};
+IO.prototype.concat = function(i) {
+  return IO(_=> this.runIO().concat(i.runIO()) );
+};
+
+
+
 IO.prototype.toTask = function(f) {
   return new Task((rej, res) => res(this.runIO()));
 };
@@ -6150,18 +6201,44 @@ IO.prototype.toTask = function(f) {
 //   return of(IO.of).ap(of(this.runIO()));
 // };
 
+//makes a -> IO b
+//(a->b) -> a=>IO(_->(a->b)(a)))...
+IO.lift = fn => (...args) => IO(_=>fn(...args));
+
+//nts from arrays of fns that create IOs to IO of effects
+//takes a
+IO.effectsToIO = xs => (...args) => xs.map(IO.lift).map(fn=>fn(...args)).sequence(IO.of);
+//lists of arguments to apply to list of functions
+IO.effectsToIO2 = fnxs => argsxs => argsxs.flap(fnxs.map(IO.lift)).sequence(IO.of);
+//combining only nullary IO effects (those that don't require arguments)
+IO.effectsToIONull = xs => xs.map(IO.lift).sequence(IO.of);
+
+
 //String->IO[Array]
 IO.$ = selectorString => new IO(_ => Array.from(document.querySelectorAll(selectorString)));
 
 IO.$id = idString => new IO(_ => document.getElementById(idString));
-IO.setStyle = (style, to) => node => new IO(_ => { node.style[style] = to; return node;}  );
-IO.setAttr = (attr, to) => node => new IO(_ => { node[attr] = to; return node;}  );
 
+//IO :: String -> String -> DOMNode -> IO DOMNode
+IO.setStyle = (style, to) => node => new IO(_ => { node.style[style] = to; return node;}  );
+IO.setAttr = (attr, to) => node => new IO(_ => { node.setAttribute(attr,to); return node;}  );
+//IO.$('#email').map(head).chain(IO.setAttr('data-filk','hi')).runIO()
 const getNodeChildren = node => Array.from(node.children);
 
 
 module.exports = IO;
-},{"../../src/other-types/Task.js":19}],14:[function(require,module,exports){
+
+
+/*
+
+  const revealInitialStep = step => Array.of(step).flap([
+    advanceBackground({initial:true}),
+    _revealStep({initial:true})
+  ].map(IO.lift)).sequence(IO.of);
+
+
+*/
+},{"../../src/other-types/Task.js":20}],14:[function(require,module,exports){
 const {I}  = require('../../src/other-types/pointfree.js');
 
 function Identity(v) {
@@ -6248,7 +6325,7 @@ Identity.chainRec = Identity.prototype.chainRec;
 //Identity.chainRec((next, done, x) => x === 0 ? Identity.of(done(x)) : Identity.of(next(x - 1)), 5)
 
 module.exports = Identity;
-},{"../../src/other-types/pointfree.js":28}],15:[function(require,module,exports){
+},{"../../src/other-types/pointfree.js":29}],15:[function(require,module,exports){
 Promise.of = Promise.prototype.of = x => Promise.resolve(x);
 Promise.prototype.map = Promise.prototype.chain = Promise.prototype.bimap = Promise.prototype.then;
 //Promise.prototype.fold = Promise.prototype.then;//is it really? 
@@ -6452,7 +6529,90 @@ module.exports = Reader;
 //
 
 //Reader(x=>x+1).run(9);//-> 10
-},{"../../src/other-types/pointfree.js":28}],17:[function(require,module,exports){
+},{"../../src/other-types/pointfree.js":29}],17:[function(require,module,exports){
+const {I, getInstance}  = require('../../src/other-types/pointfree.js');
+
+function RemoteData(){
+  throw new TypeError('Constructor cannot be called directly');
+}
+
+const NotAsked = function(){
+  if (!(this instanceof NotAsked)) {
+    return new NotAsked();
+  }
+};
+
+const Requested = function(r){
+  if (!(this instanceof Requested)) {
+    return new Requested(r);
+  }
+  this.x = r;//resource pointer
+};
+const Loading = function(l){
+  if (!(this instanceof Loading)) {
+    return new Loading(l);
+  }
+  this.x = l;//request meta data
+};
+const Failure = function(e){
+  if (!(this instanceof Failure)) {
+    return new Failure(e);
+  }
+  this.x = e;//error type
+};
+const Success = function(s){
+  if (!(this instanceof Success)) {
+    return new Success(s);
+  }
+  this.x = s;//expected type
+};
+
+const subtypes = [NotAsked,Requested,Loading,Failure,Success];
+
+subtypes.forEach(type=>{
+  type.prototype = Object.create(RemoteData.prototype);
+  type.prototype.name = type.name;
+  RemoteData[type.name] = type;
+  RemoteData.prototype[`if${type.name}`] = function(f){
+    return this.name===type.name? f(this.x) : this;
+  }
+});
+
+RemoteData.NotAsked = NotAsked();//only ever need the one instance
+
+RemoteData.of = x => Success(x);
+
+RemoteData.prototype.cata = function(dispatches){
+  console.log(`name: ${typeof this}`)
+  return dispatches[this.name](this.x);
+}
+
+RemoteData.prototype.chain = function(f){
+  return this.cata({
+    NotAsked: _=>this,
+    Requested: _=>this,
+    Loading: _=>this,
+    Failure: _=>this,
+    Success: s => f(s)
+  })
+}
+
+RemoteData.prototype.fold = function(lf,ef,sf){
+  return this.cata({
+    NotAsked: _=>null,
+    Requested: _=>null,
+    Loading: _=>lf(this.x),
+    Failure: _=>ef(this.x),
+    Success: _=>sf(this.x)
+  })
+}
+
+RemoteData.prototype.map = function(f){
+  return this.chain(x=>Success.of(f(x)));
+} 
+
+module.exports = RemoteData;
+},{"../../src/other-types/pointfree.js":29}],18:[function(require,module,exports){
 const {curry}  = require('../../src/other-types/pointfree.js');
 
 var Identity = require('./Identity');
@@ -6539,7 +6699,7 @@ State.prototype.run = function(s) {
 };
 
 module.exports = State;
-},{"../../src/other-types/pointfree.js":28,"./Identity":14,"./Tuple":21,"./utility":29}],18:[function(require,module,exports){
+},{"../../src/other-types/pointfree.js":29,"./Identity":14,"./Tuple":22,"./utility":30}],19:[function(require,module,exports){
 //http://stackoverflow.com/questions/8766246/what-is-the-store-comonad
 //very similar to lenses in some way: it's a getter/setter focused on a particular external context
 //lenses are, in fact, coalgebras of the store/costate monad
@@ -6591,7 +6751,7 @@ Store.prototype.over = function(f) {
 };
 
 module.exports = Store;
-},{}],19:[function(require,module,exports){
+},{}],20:[function(require,module,exports){
 
 
 const logFn = fn => {
@@ -6609,7 +6769,7 @@ const logFn = fn => {
 // fn => Task fn
 const Task = function(computation, annotation){
   if (!(this instanceof Task)) {
-    return new Task(computation);
+    return new Task(computation, annotation);
   }
   this.fork = (eh, sh) => {
     const result = computation(eh,sh);
@@ -6724,6 +6884,10 @@ Task.prototype.orElse = function(f){
   );
 }
 
+Task.timeout = ms => Task((rej,res)=> setTimeout(res,ms),`_=>Task.timeout(${ms})`);
+
+Task.liftWait = ms => x => Task((rej,res)=> setTimeout(_=>res(x),ms),`x=>Task.liftWait(${ms})`);
+
 
 /*adapters*/
 
@@ -6741,11 +6905,10 @@ Task.fetch = fetchTask;
 Task.taskify = taskify;
 
 //x=>x.json() -> Task.to('json')
-Task.to = method => resource => 
-  new Task((rej,res) => resource[method]().then(res,rej))
+Task.to = method => resource => new Task((rej,res) => resource[method]().then(res).catch(rej));
 
 module.exports = Task;
-},{}],20:[function(require,module,exports){
+},{}],21:[function(require,module,exports){
 const {Any, Max}  = require('../../src/other-types/monoids.js');
 const {foldMap}  = require('../../src/other-types/pointfree.js');
 
@@ -6875,7 +7038,7 @@ const longestAnnotation = tree => tree.reduce((acc, x)=> acc.length>x.length? ac
 module.exports = {
   Leaf, Branch, changed, largest, longestAnnotation
 };
-},{"../../src/other-types/monoids.js":26,"../../src/other-types/pointfree.js":28}],21:[function(require,module,exports){
+},{"../../src/other-types/monoids.js":27,"../../src/other-types/pointfree.js":29}],22:[function(require,module,exports){
 function Tuple(x, y) {
   if (!(this instanceof Tuple)) {
     return new Tuple(x,y);
@@ -6923,166 +7086,7 @@ Tuple.prototype.sequence = function(of){
 }
 
 module.exports = Tuple;
-},{}],22:[function(require,module,exports){
-const {curry, K, I, mconcat, ap}  = require('../../src/other-types/pointfree.js');
-
-function Validation(){
-  throw new Error("Not called directly");
-}
-
-const Failure = function(x){
-  if (!(this instanceof Failure)) {
-    return new Failure(x);
-  }
-  if(x==null || !x.concat){
-    throw new Error("Failure values must have a concat method (e.g. Strings, Arrays, etc.)")
-  }
-  this.e = x;//storing the value
-};
-
-Failure.prototype = Object.create(Validation.prototype);
-
-const Success = function(x){
-  if (!(this instanceof Success)) {
-    return new Success(x);
-  }
-  this.s = x;//storing the value
-};
-
-Success.prototype = Object.create(Validation.prototype);
-
-//let's create a cata interface with which we can define many of the others
-Failure.prototype.cata = function({Failure}){ return Failure(this.e) };
-Success.prototype.cata = function({Success}){ return Success(this.s) };
-
-Validation.prototype.fold = Validation.prototype.reduce = function(f, g) {
-  return this.cata({
-    Failure: f,
-    Success: g
-  });
-};
-
-Validation.prototype.map = function(f) {
-  return this.cata({
-    Failure: e => this,
-    Success: e => Success(f(e))
-  });
-};
-
-
-Failure.prototype.ap = function(b) {
-  return b.cata({
-    Failure: e => Failure(this.e.concat(e)),
-    Success: s => this
-  });
-}
-
-Success.prototype.ap = function(b) {
-  return b.cata({
-    Failure: e => b,
-    Success: s => b.map(this.s)
-  });
-}
-
-Validation.prototype.getOrElse = function(a) {
-  return this.cata({
-    Failure: e => a,
-    Success: _ => this.s
-  });
-}
-
-Success.prototype.concat = function(b) {
-  return b.cata({
-    Failure: e => b,
-    Success: s => b.map(bs=>this.s.concat(bs))
-  });
-}
-
-Failure.prototype.concat = function(b) {
-  return b.cata({
-    Failure: e => Failure(this.e.concat(e)),
-    Success: s => this
-  });
-}
-
-//https://github.com/fantasyland/fantasy-validations/blob/master/src/validation.js#L44-L54
-// Validation.prototype.concat = function(b) {
-//     return this.fold(
-//         f => {
-//             return b.bimap(
-//                 g => f.concat(g),
-//                 identity
-//             );
-//         },
-//         s => b.map(d => s.concat(d))
-//     );
-// };
-
-Validation.prototype.getOrElse = function(a) {
-  return this.cata({
-    Failure: e => a,
-    Success: _ => this.s
-  });
-}
-
-
-//probably not right
-Failure.prototype.sequence = function(of) {
-  return this.e.map(Failure);
-}
-
-Success.prototype.sequence = function(of) {
-  return this.s.map(Failure);
-}
-
-Validation.prototype.leftMap = function(f) {
-  return this.cata({
-    Failure: e => Failure(f(e)),
-    Success: _ => this
-  });
-}
-
-
-Object.assign(Validation.prototype,{
-  of: x => new Success(x),
-  fromNullable: a => a != null ? new Success(a) : new Failure(a),
-  //toEither: ,
-  //toMaybe: ,
-  fromEither: a => a.fold(Failure, Success),
-  fromMaybe: a => a.fold(Failure('No value'), Success),
-  toPromise: function(){
-    return this.cata({
-      Failure: e => Promise.reject(e),
-      Success: s => Promise.of(s)
-    })
-  }
-});
-
-Validation.of = Validation.prototype.of;
-Validation.fromNullable = Validation.prototype.fromNullable;
-Validation.fromMaybe = Validation.prototype.fromMaybe;
-Validation.fromEither = Validation.prototype.fromEither;
-
-//nope: need the value to return a success...
-const mconcatv = x => mconcat(x, Validation.of(x));
-
-
-//not quite working, is traverse wrong?
-const aggregateValidationsFailed = (...testList) => testValue => testList.traverse(test=>test(testValue), Validation.of);
-
-const aggregateValidations = (arrayOfTests) => arrayOfTests.length ?
-  compose(mconcat, ap(arrayOfTests), Array.of) ://concat
-  x => Success(x);//empty case is usually a mistake, but it returns the original value at least
-
-//run values over matching lists, then concat all the lists to get the final validation of all values, success/fail list
-
-module.exports = {
-  Validation,
-  Failure,
-  Success,
-  aggregateValidations
-};
-},{"../../src/other-types/pointfree.js":28}],23:[function(require,module,exports){
+},{}],23:[function(require,module,exports){
 function Writer(l, v) {
   if (!(this instanceof Writer)) {
     return new Writer(l,v);
@@ -7310,6 +7314,9 @@ const Const  = require('../../src/other-types/Const.js');
       { num : arrayLens, mapped, traversed }
     );
 
+    //const _all = where => n => xs => makeLens(xs[], x=>x===)
+
+
 module.exports ={
     makeLens,
     makeLenses,
@@ -7332,14 +7339,81 @@ module.exports ={
 
 
 
-},{"../../src/other-types/Const.js":8,"../../src/other-types/Identity.js":14,"../../src/other-types/pointfree.js":28}],26:[function(require,module,exports){
+},{"../../src/other-types/Const.js":8,"../../src/other-types/Identity.js":14,"../../src/other-types/pointfree.js":29}],26:[function(require,module,exports){
+const {Either, Right, Left}  = require('../../src/other-types/Either.js');
+const {compose, I, lift}  = require('../../src/other-types/pointfree.js');
+
+const takeLarger = x => y => x > y ? x : y;
+const takeSmaller = x => y => x < y ? x : y;
+
+//for 2 already sorted lists
+const mergeSort = (xs, ys) => {
+  if(!xs.length){
+    return ys;
+  }
+  else if(!ys.length){
+    return xs
+  }
+  else if (head(xs)<head(ys)){
+    return [head(xs)].concat( mergeSort(tail(xs), ys) )
+  }
+  else{
+    return [head(ys)].concat( mergeSort(xs, tail(ys)) )
+  }
+}
+
+
+//now we're trying to work this out in terms of Either
+const mergeSort2 = (xs, ys) => {
+  return smallerHead(xs,ys)
+}
+
+
+//smallerHead :: Array -> Array -> a
+const smallerHead = (xs, ys) => {
+  return Either.safeHead(xs)
+    .orElse(Infinity)
+    .map(takeSmaller)
+    .ap(
+      Either.safeHead(ys).orElse(Infinity)
+    )
+}
+
+//trying 
+//......
+const takeSmallerRec = xs => ys => x => y => x < y ? 
+  [x].concat(takeSmallerRec(tail(xs),ys)) : 
+  [y].concat(takeSmallerRec(xs, tail(ys)));
+
+//smallerHead :: Array -> Array -> a
+const smallerHeadSort = (xs, ys) => {
+  return Either.safeHead(xs)
+    //.orElse(Infinity)
+    .map(takeSmallerRec(xs,ys))
+    .ap(
+      Either.safeHead(ys)//.orElse(Infinity)
+    )
+    .fold(_=>[],I)//nope
+}
+
+
+
+module.exports = {
+  mergeSort,
+  takeLarger,
+  takeSmaller,
+  smallerHead
+}
+//mergeSort([1,5,89,100],[2,3,4,5,8,90])
+},{"../../src/other-types/Either.js":11,"../../src/other-types/pointfree.js":29}],27:[function(require,module,exports){
 //...and semigroups...
 //concatenation is composition with one type (closed composition)
 const {Left, Right}  = require('../../src/other-types/Either.js');
-
+const {foldMap, compose}  = require('../../src/other-types/pointfree.js');
 
 String.prototype.empty = x => '';//makes string a well behaved monoid for left to right cases
 String.empty = String.prototype.empty;
+//String.zero = String.prototype.zero = ;//there isn't one!
 
 const Endo = function(runEndo){
   if (!(this instanceof Endo)) {
@@ -7350,18 +7424,55 @@ const Endo = function(runEndo){
 
 Endo.of = x => Endo(x);
 Endo.empty = Endo.prototype.empty = _ => Endo(x=>x);
+//Endo.zero = Endo.prototype.zero = _ => Endo(x=>Endo);//also can't think of one
 
 //concat is just composition
 Endo.prototype.concat = function(y) {
   return Endo(compose(this.appEndo,y.appEndo));
 };
-Endo.prototype.getResult = function() { return this.appEndo; }
+Endo.prototype.getResult = function() { return this.appEndo(); }
 
 //concat is just composition
 Endo.prototype.concat = function(y) {
   return Endo(compose(this.appEndo,y.appEndo));
 };
+Endo.prototype.fold = function(f) {
+  return f(this.appEndo);
+};
 
+//composing together semigroup creating functions 
+const Fn = function(f){
+  if (!(this instanceof Fn)) {
+    return new Fn(f);
+  }
+  this.f = f;//f is a fn that takes some value and returns some semigroup
+}
+Fn.prototype.fold = function(x){
+  return this.f(x);
+}
+//o must be a Fn(f) where f is a function that returns the same semi-group
+Fn.prototype.concat = function(o){
+  return Fn(x=>this.f(x).concat(o.fold(x)));//extends the Fns to apply an eventual arg to both
+}
+Fn.empty = Fn.prototype.empty = _ => Fn(x=>x);
+/*
+
+Fn(x=>IO(_=>console.log(x+1))).concat(Fn(x=>IO(_=>console.log(x+9)))).fold(6).runIO()
+
+
+//semigroups can be used to define a filter predicate from composed parts
+const Fn = f => ({
+  fold: f,
+  concat: o => Fn(x=>f(x).concat(o.fold(x)))
+});
+
+const hasVowels = x => !!x.match(/[aeiou]/ig);
+const longWord = x => x.length >= 5;
+
+const longVowels = Fn(compose(All, hasVowels)).concat(Fn(compose(All, longWord)));
+
+['gym','wdwdwdwdwdwd','adgesdfasf'].filter(x=>longVowels.fold(x).x);//->['adgesdfasf']
+*/
 
 /*
 thinking through it...
@@ -7391,12 +7502,16 @@ const Disjunction = function(x){
 
 Disjunction.of = x => Disjunction(x);
 Disjunction.empty = Disjunction.prototype.empty = () => Disjunction(false);
+Disjunction.zero = Disjunction.prototype.zero = () => Disjunction(true);
 
 Disjunction.prototype.equals = function(y) {
     return this.x === y.x;
 };
 Disjunction.prototype.concat = function(y) {
     return Disjunction(this.x || y.x);
+};
+Disjunction.prototype.fold = function(f) {
+    return f(this.x);
 };
 
 //a Disjunction of true, once concatted to any other Disjunction, can never be turned false
@@ -7405,7 +7520,7 @@ Disjunction.prototype.concat = function(y) {
 const Any = Disjunction;
 
 
-//Conjunction, the sticky-false Monoid (i.e. all must be true or "any false")
+//Conjunction, the sticky-false Monoid (i.e. all must be true)
 const Conjunction = function(x){
   if (!(this instanceof Conjunction)) {
     return new Conjunction(x);
@@ -7415,12 +7530,16 @@ const Conjunction = function(x){
 
 Conjunction.of = x => Conjunction(x);
 Conjunction.empty = Conjunction.prototype.empty = () => Conjunction(true);
+Conjunction.zero = Conjunction.prototype.zero = () => Conjunction(false);
 
 Conjunction.prototype.equals = function(y) {
     return this.x === y.x;
 };
 Conjunction.prototype.concat = function(y) {
     return Conjunction(this.x && y.x);
+};
+Conjunction.prototype.fold = function(f) {
+    return f(this.x);
 };
 
 //a Conjunction of false, once concatted to any other Conjunction, can never be turned true
@@ -7439,17 +7558,41 @@ const Sum = function(x){
 
 Sum.of = x => Sum(x);
 Sum.empty = Sum.prototype.empty = () => Sum(0);
+Sum.zero = Sum.prototype.zero = () => Sum(Infinity);
 
 Sum.prototype.concat = function(y) {
     return Sum(this.x + y.x);
 };
+Sum.prototype.fold = function(f) {
+    return f(this.x);
+};
+
 
 // Sum = x => ({
 //   x,
 //   concat: ({x:y}) => Sum(x+y)
 // })
+//List.of(1,2,4).foldMap(Sum, Sum.empty())
 
+const Product = function(x){
+  if (!(this instanceof Product)) {
+    return new Product(x);
+  }
+  this.x = x;
+}
 
+Product.of = x => Product(x);
+Product.empty = Product.prototype.empty = () => Product(1);
+Product.zero = Product.prototype.zero = () => Product(0);
+
+Product.prototype.concat = function(y) {
+    return Product(this.x * y.x);
+};
+Product.prototype.fold = function(f) {
+    return f(this.x);
+};
+
+/*
 const First = function(x){
   if (!(this instanceof First)) {
     return new First(x);
@@ -7462,45 +7605,66 @@ First.of = x => First(x);
 First.prototype.concat = function(y) {
     return this;
 };
-//but this has no possible empty interface
+//but this has no possible "empty" interface
+*/
 
-
-//not anywhere near right, but there IS a possible way to make any semigroup work as a monoid, sort of by elevating it up a level
-const Firsty = function(x){
-  if (!(this instanceof Firsty)) {
-    return new Firsty(x);
+//there IS a possible way to make any semigroup work as a monoid, though, sort of by elevating it up a level
+const First = function(either){
+  if (!(this instanceof First)) {
+    return new First(either);
   }
-  this.x = Right(x);
+  this.either = either;
 }
-
-Firsty.of = x => Firsty(x);
+First.prototype.fold = function(f){
+  return f(this.either);
+};
+First.of = x => First(Right(x));
 
 //not correct, but sort of on that track 
-Firsty.prototype.concat = function(y) {
-  return this.x.fold()
+First.prototype.concat = function(o) {
+  return this.either.cata({
+    Right: x => First(this.either),
+    Left: _ => o
+  });
 };
 //and now we can define this
-Firsty.empty = _ => Left(null);
+First.empty = _ => First(Left());
+
+//static method
+First.foldMap = (xs, f) => foldMap(First, x=> First(f(x)? Right(x): Left()), xs).fold(I);
+/*
+
+//some use cases for First
+
+const find = (xs, f) => foldMap(First, x=> First(f(x)? Right(x): Left()), xs).fold(I);
+find([3,4,5,6,7], x=> x>4);// -> finds just the first one, if any
+*/
 
 
-//List.of(1,2,4).foldMap(Sum, Sum.empty())
 
-
-
-const Last = function(x){
+const Last = function(either){
   if (!(this instanceof Last)) {
-    return new Last(x);
+    return new Last(either);
   }
-  this.x = x;
+  this.either = either;
 }
-
-Last.of = x => Last(x);
-
-Last.prototype.concat = function(y) {
-    return y;
+Last.prototype.fold = function(f){
+  return f(this.either)
 };
+Last.of = x => Last(Right(x));
+
+//not correct, but sort of on that track 
+Last.prototype.concat = function(o) {
+  return this.either.cata({
+    Right: x => o,
+    Left: _ => o
+  });
+};
+//and now we can define this
+Last.empty = _ => Last(Left());
 
 
+Last.foldMap = (xs, f) => foldMap(Last, x=> Last(f(x)? Right(x): Left()), xs).fold(I);
 
 
 
@@ -7513,6 +7677,7 @@ const Max = function(x){
 
 Max.of = x => Max(x);
 Max.empty = Max.prototype.empty = () => Max(0);
+Max.zero = Max.prototype.zero = () => Max(Infinity);
 
 Max.prototype.equals = function(y) {
     return Max(this.x === y.x);
@@ -7532,6 +7697,7 @@ const Min = function(x){
 
 Min.of = x => Min(x);
 Min.empty = Min.prototype.empty = () => Min(Infinity);
+Min.zero = Min.prototype.zero = () => Min(-Infinity);
 
 Min.prototype.equals = function(y) {
     return Min(this.x === y.x);
@@ -7543,7 +7709,7 @@ Min.prototype.concat = function(y) {
 
 
 //Max 
-//Min, etc. all really require some further constraints, like Ord
+//Min, etc. all really require some further constraints, like Ord?
 
 /*
 const rec1 =  Map({
@@ -7561,10 +7727,11 @@ const rec2 = Map({
 now we can teach entire objects how to combine because all their values are captured in types that know how they work
 
 */
-const getResult = M => M.getResult ? M.getResult() : M.x;
+const getResult = M => M.getResult ? M.getResult() : M.fold(I);
 
 module.exports = {
   Sum,
+  Product,
   Additive: Sum,
   Disjunction: Any,
   Any,
@@ -7575,9 +7742,11 @@ module.exports = {
   Min,
   First,
   Last,
-  Firsty
+  First,
+  Last,
+  Fn
 }
-},{"../../src/other-types/Either.js":11}],27:[function(require,module,exports){
+},{"../../src/other-types/Either.js":11,"../../src/other-types/pointfree.js":29}],28:[function(require,module,exports){
 const Task  = require('../../src/other-types/Task.js');
 
 //natural transformation
@@ -7675,7 +7844,7 @@ module.exports = {
   maybeToEither,
   maybeToIO
 }
-},{"../../src/other-types/Task.js":19}],28:[function(require,module,exports){
+},{"../../src/other-types/Task.js":20}],29:[function(require,module,exports){
 const compose  = (fn, ...rest) =>
   rest.length === 0 ?
     (fn||(x=>x)) :
@@ -7701,12 +7870,15 @@ const andCall = curry(
   (methodname, obj) => obj[methodname](...args)
 );
 
-
+//these assume that Function/Promise/Array have .ap/.chain/etc. defined, but those could be polyfilled
 const ap = curry((A, A2) => A.ap(A2));
 const map = curry((f, F) => F.map(x=>f(x)));//guard against Array.map
-const reduce = curry((f, acc, F) => F.reduce(f,acc));
+const reduce = curry((f, acc, Foldable) => Foldable.reduce(f,acc));
 const chain = curry((f, M) => M.chain(f));
-
+  //function version
+  // if (typeof monad === 'function') {
+  //   return function(x) { return fn(monad(x))(x); };
+  // }
 
 const lift = map;
 const liftA2 = curry((f, A1, A2) => A1.map(f).ap(A2));//
@@ -7724,6 +7896,10 @@ const iso = dimap;
 
 iso.mapISO = iso(x=>[...x], xs=>new Map(xs));
 
+const Iso = (to,from) => ({to,from});
+
+const singleton = Iso(e=>e.fold(_=>[],x=>[x]),([x])=>x?Right(x):Left(undefined))
+const filterEither = (e,pred) => singleton.from(singleton.to(e).filter(pred))
 
 //based off of https://github.com/DrBoolean/immutable-ext
 Map.prototype.concat = function(otherMap){
@@ -7765,7 +7941,7 @@ const init = xs => xs.slice(0,-1);
 const tail = xs => xs.tail || xs.slice(1, Infinity);
 const last = xs => xs.last ? xs.last() : xs.slice(-1)[0];
 const prop = namespace => obj => obj[namespace];
-
+const append = x => xs => xs.concat(x);
 
 //these two include polyfills for arrays
 const extend = fn => W => {
@@ -7779,8 +7955,9 @@ const extract = W => {
     head(W);
 };
 
-const concat = curry( (x, y) => x.concat(y));
+const concat = curry( (xs, x) => xs.concat(x));
 //inferring empty is not a great idea here...
+//m here stands for monoid, not monad
 const mconcat = (xs, empty) => xs.length||xs.size() ? xs.reduce(concat, empty) : empty ? empty() : xs.empty();
 const bimap = curry((f,g,B)=> B.bimap(f,g)); 
 
@@ -7871,15 +8048,12 @@ const converge = curry((f, g, h) => (...args) => f(g(...args), h(...args)));
 const apply  = f => arr => f(...arr)
 const unapply = f => (...args) => f(args);
 
-
-
-
-
 module.exports = {
   I,
   K,
   S,
   W,
+  append,
   apply,
   unapply,
   compose,
@@ -7913,6 +8087,7 @@ module.exports = {
   lmap,
   rmap,
   iso,
+  Iso,
   dimap,
   any,
   all,
@@ -7920,9 +8095,10 @@ module.exports = {
   binaryLeft,
   binaryRight
 };
-},{}],29:[function(require,module,exports){
+},{}],30:[function(require,module,exports){
 (function (global){
 const {curry}  = require('../../src/other-types/pointfree.js');
+const IO = require('../../src/other-types/IO.js');
 
 //delay :: Integer -> Promise null
 const delay = ms => new Promise(resolve => global.setTimeout(resolve, ms));
@@ -7982,6 +8158,24 @@ const setStyleProp = (propString, newValue) => node => IO(_ => { node.style[prop
 //Reader.ask.map(IO.$).map(map(Maybe.head)).map(chain(traverse(setStyleProp('color','red'), IO.of))).map(x=>x.runIO()).run
 //document.addEventListener('click', compose(runIO, chain(setStyleProp('color','red')), IO.of, e=>e.target))
 
+  //utility function for setting and getting cookies
+  function gup(name) {
+      name = name.replace(/(\[|\])/g,"\\$1");
+      var regex = new RegExp("[\\?&]"+name+"=([^&#]*)"),
+          results = regex.exec( window.location.href );
+      return ( results === null )?"":results[1];
+  }
+  //get cookies
+  function c(k){return(document.cookie.match('(^|; )'+k+'=([^;]*)')||0)[2];}
+
+  function setcookie(n,v,ex) { 
+    document.cookie = n+"="+v+"; Path=/; domain="+window.location.hostname+"; "+((ex)?"expires="+new Date(Date.now()+(ex*864e5)).toGMTString():'');
+    return v;
+  }
+
+  const [gupIO, cIO, setcookieIO] = [gup,c,setcookie].map(IO.lift);
+
+
 
 module.exports = {
   add,
@@ -7998,7 +8192,8 @@ module.exports = {
   getNodeChildren,
   setHTML,
   setStyleProp,
-  booleanEquals
+  booleanEquals,
+  gupIO, cIO, setcookieIO
 };
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{"../../src/other-types/pointfree.js":28}]},{},[1]);
+},{"../../src/other-types/IO.js":13,"../../src/other-types/pointfree.js":29}]},{},[1]);

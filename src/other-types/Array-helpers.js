@@ -9,15 +9,15 @@ Array.prototype.ap = function(a) {
   return this.reduce( (acc,f) => acc.concat( a.map(f) ), []);//also works, & doesn't use chain
 };
 Array.prototype.flap = function(a) {
-  //??? reversed version?
+  return a.reduce( (acc,f) => acc.concat( this.map(f) ), []);//also works, & doesn't use chain
 };
 
 
 Array.prototype.sequence = function(point){
-    return this.reduceRight(
+    return this.reduce(
       function(acc, x) {
         return acc
-          .map(innerarray => othertype => [othertype].concat(innerarray) )//puts this function in the type
+          .map(innerarray => othertype => innerarray.concat(othertype) )//puts this function in the type
           .ap(x);//then applies the inner othertype value to it
       },
       point([])
@@ -25,8 +25,8 @@ Array.prototype.sequence = function(point){
 };
 //from fantasyland: https://github.com/safareli/fantasy-land/blob/98e363427c32a67288d45063b0a5627b912ee8b6/internal/patch.js#L13
 //do these use the reversed .ap?
-Array.prototype.flsequence = function(f, p) {
-  return this.map(f).reduce(
+Array.prototype.flsequence = function(p) {
+  return this.reduce(
     (ys, x) => ys.ap(x.map(y => z => z.concat(y))),
     p([])
   );

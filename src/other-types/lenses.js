@@ -51,6 +51,9 @@ const Const  = require('../../src/other-types/Const.js');
       { num : arrayLens, mapped, traversed }
     );
 
+    //const _all = where => n => xs => makeLens(xs[], x=>x===)
+
+
 module.exports ={
     makeLens,
     makeLenses,

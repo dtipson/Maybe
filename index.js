@@ -16,8 +16,11 @@ const State = require('./src/other-types/State.js');
 const Store = require('./src/other-types/Store.js');
 const Tuple = require('./src/other-types/Tuple.js');
 const Task = require('./src/other-types/Task.js');
+const RemoteData = require('./src/other-types/RemoteData.js');
 const Writer = require('./src/other-types/Writer-array.js');
 const { List, Map } = require('immutable-ext');
+
+const {NotAsked,Requested,Loading,Failure,Success} = RemoteData;
 
 Object.assign(
   window,
@@ -26,11 +29,12 @@ Object.assign(
   require('./src/media-recorder/videobooth.js'),
   require('./src/other-types/Either.js'),
   require('./src/other-types/lenses.js'),
-  {Compose, Const, Continuation, Cont:Continuation, List, Task, Coyoneda, Id: Identity, Identity, Box: Identity, IO, Map, Reader, Tuple, State, Store, Writer},
+  {Compose, Const, Continuation, Cont:Continuation, List, Task, Coyoneda, Id: Identity, Identity, Box: Identity, IO, Map, Reader, RemoteData, Tuple, State, Store, Writer, NotAsked,Requested,Loading,Failure,Success},
   require('./src/other-types/pointfree.js'),
+  require('./src/other-types/merges.js'),
   require('./src/other-types/monoids.js'),
   require('./src/other-types/Tree.js'),
-  require('./src/other-types/Validation.js'),
+  //require('./src/other-types/Validation.js'),
   require('./src/other-types/natural-transformations.js'),
   require('./src/other-types/utility.js')
 );
